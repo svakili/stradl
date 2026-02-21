@@ -36,7 +36,18 @@ function hasUnresolvedBlockers(taskId: number, data: ReturnType<typeof readData>
   return data.blockers.some(b => b.taskId === taskId && !b.resolved);
 }
 
-// GET /api/tasks?tab=tasks|ideas|blocked|archive
+function getPrioritizedTasks(data: ReturnType<typeof readData>): Task[] {
+  return data.tasks
+    .filter(t => t.priority != null && !t.isArchived && t.completedAt == null && !hasUnresolvedBlockers(t.id, data))
+    .sort((a, b) => {
+      const pa = PRIORITY_ORDER[a.priority!] ?? 99;
+      const pb = PRIORITY_ORDER[b.priority!] ?? 99;
+      if (pa !== pb) return pa - pb;
+      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    });
+}
+
+// GET /api/tasks?tab=tasks|backlog|ideas|blocked|completed|archive
 taskRoutes.get('/tasks', (req, res) => {
   const data = readData();
   const tab = (req.query.tab as string) || 'tasks';
@@ -50,15 +61,11 @@ taskRoutes.get('/tasks', (req, res) => {
 
   switch (tab) {
     case 'tasks':
-      filtered = data.tasks
-        .filter(t => t.priority != null && !t.isArchived && t.completedAt == null && !hasUnresolvedBlockers(t.id, data))
-        .sort((a, b) => {
-          const pa = PRIORITY_ORDER[a.priority!] ?? 99;
-          const pb = PRIORITY_ORDER[b.priority!] ?? 99;
-          if (pa !== pb) return pa - pb;
-          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-        })
-        .slice(0, data.settings.topN);
+      filtered = getPrioritizedTasks(data).slice(0, data.settings.topN);
+      break;
+
+    case 'backlog':
+      filtered = getPrioritizedTasks(data).slice(data.settings.topN);
       break;
 
     case 'ideas':
@@ -71,6 +78,12 @@ taskRoutes.get('/tasks', (req, res) => {
       filtered = data.tasks
         .filter(t => !t.isArchived && t.completedAt == null && hasUnresolvedBlockers(t.id, data))
         .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+      break;
+
+    case 'completed':
+      filtered = data.tasks
+        .filter(t => t.completedAt != null && !t.isArchived)
+        .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
       break;
 
     case 'archive':

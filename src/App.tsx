@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { TabName, Task } from './types';
+import type { TabName, Task, Settings } from './types';
 import { useTasks } from './hooks/useTasks';
 import { useSettings } from './hooks/useSettings';
 import { useBlockers } from './hooks/useBlockers';
@@ -11,7 +11,7 @@ import SettingsPanel from './components/SettingsPanel';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabName>('tasks');
-  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, ideas: 0, blocked: 0, archive: 0 });
+  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 });
   const [allTasks, setAllTasks] = useState<Task[]>([]);
 
   const { tasks, loading, reload, create, update, complete, uncomplete, remove } = useTasks(activeTab);
@@ -19,9 +19,9 @@ export default function App() {
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
 
   const loadCounts = useCallback(async () => {
-    const tabs: TabName[] = ['tasks', 'ideas', 'blocked', 'archive'];
+    const tabs: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed', 'archive'];
     const results = await Promise.all(tabs.map(t => api.fetchTasks(t)));
-    const newCounts: Record<TabName, number> = { tasks: 0, ideas: 0, blocked: 0, archive: 0 };
+    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 };
     tabs.forEach((t, i) => { newCounts[t] = results[i].length; });
     setCounts(newCounts);
     // Collect all tasks for blocker form dropdowns
@@ -72,13 +72,19 @@ export default function App() {
     await handleReload();
   };
 
+  const handleUpdateSettings = async (data: Partial<Settings>) => {
+    await updateSettings(data);
+    await reload();
+    await loadCounts();
+  };
+
   const showForm = activeTab === 'tasks' || activeTab === 'ideas';
 
   return (
     <div className="app">
       <header className="header">
         <h1>Stradl</h1>
-        <SettingsPanel settings={settings} onUpdate={updateSettings} />
+        <SettingsPanel settings={settings} onUpdate={handleUpdateSettings} />
       </header>
 
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} counts={counts} />
