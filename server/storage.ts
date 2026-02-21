@@ -44,7 +44,7 @@ function defaultData(): AppData {
     tasks: [],
     blockers: [],
     settings: {
-      staleThresholdHours: 24,
+      staleThresholdHours: 48,
       topN: 20,
       globalTimeOffset: 0,
     },
