@@ -11,5 +11,6 @@
     "declaration": false,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["server"]
+  "include": ["server"],
+  "exclude": ["server/__tests__"]
 }

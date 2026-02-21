@@ -1,51 +1,9 @@
 import { Router } from 'express';
 import { readData, writeData } from '../storage.js';
 import type { Task } from '../storage.js';
+import { autoUnblock, hasUnresolvedBlockers, getPrioritizedTasks, PRIORITY_ORDER } from '../task-logic.js';
 
 export const taskRoutes = Router();
-
-const PRIORITY_ORDER: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
-
-function autoUnblock(data: ReturnType<typeof readData>): boolean {
-  const now = new Date();
-  let changed = false;
-
-  for (const blocker of data.blockers) {
-    if (blocker.resolved) continue;
-
-    // Date-based auto-unblock
-    if (blocker.blockedUntilDate && new Date(blocker.blockedUntilDate) <= now) {
-      blocker.resolved = true;
-      changed = true;
-    }
-
-    // Task-based auto-unblock
-    if (blocker.blockedByTaskId != null) {
-      const blockingTask = data.tasks.find(t => t.id === blocker.blockedByTaskId);
-      if (blockingTask && blockingTask.completedAt != null) {
-        blocker.resolved = true;
-        changed = true;
-      }
-    }
-  }
-
-  return changed;
-}
-
-function hasUnresolvedBlockers(taskId: number, data: ReturnType<typeof readData>): boolean {
-  return data.blockers.some(b => b.taskId === taskId && !b.resolved);
-}
-
-function getPrioritizedTasks(data: ReturnType<typeof readData>): Task[] {
-  return data.tasks
-    .filter(t => t.priority != null && !t.isArchived && !t.isDeleted && t.completedAt == null && !hasUnresolvedBlockers(t.id, data))
-    .sort((a, b) => {
-      const pa = PRIORITY_ORDER[a.priority!] ?? 99;
-      const pb = PRIORITY_ORDER[b.priority!] ?? 99;
-      if (pa !== pb) return pa - pb;
-      return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-    });
-}
 
 // GET /api/tasks?tab=tasks|backlog|ideas|blocked|completed|archive|trash
 taskRoutes.get('/tasks', (req, res) => {
@@ -61,11 +19,25 @@ taskRoutes.get('/tasks', (req, res) => {
 
   switch (tab) {
     case 'tasks':
-      filtered = getPrioritizedTasks(data).slice(0, data.settings.topN);
+      filtered = getPrioritizedTasks(data)
+        .slice(0, data.settings.topN)
+        .sort((a, b) => {
+          const pa = PRIORITY_ORDER[a.priority!] ?? 99;
+          const pb = PRIORITY_ORDER[b.priority!] ?? 99;
+          if (pa !== pb) return pa - pb;
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        });
       break;
 
     case 'backlog':
-      filtered = getPrioritizedTasks(data).slice(data.settings.topN);
+      filtered = getPrioritizedTasks(data)
+        .slice(data.settings.topN)
+        .sort((a, b) => {
+          const pa = PRIORITY_ORDER[a.priority!] ?? 99;
+          const pb = PRIORITY_ORDER[b.priority!] ?? 99;
+          if (pa !== pb) return pa - pb;
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        });
       break;
 
     case 'ideas':
