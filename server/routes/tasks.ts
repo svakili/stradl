@@ -113,7 +113,7 @@ taskRoutes.post('/tasks', (req, res) => {
   const task: Task = {
     id: data.nextTaskId++,
     title: title.trim(),
-    status: status || '',
+    status: typeof status === 'string' ? status.trim() : '',
     priority: priority || null,
     createdAt: now,
     updatedAt: now,
@@ -139,7 +139,7 @@ taskRoutes.put('/tasks/:id', (req, res) => {
 
   const { title, status, priority, isArchived } = req.body;
   if (title !== undefined) task.title = title.trim();
-  if (status !== undefined) task.status = status;
+  if (status !== undefined) task.status = typeof status === 'string' ? status.trim() : status;
   if (priority !== undefined) task.priority = priority || null;
   if (isArchived !== undefined) task.isArchived = isArchived;
   task.updatedAt = new Date().toISOString();
