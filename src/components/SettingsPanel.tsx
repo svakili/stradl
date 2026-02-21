@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Settings } from '../types';
 
 interface Props {
@@ -8,9 +8,23 @@ interface Props {
 
 export default function SettingsPanel({ settings, onUpdate }: Props) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   return (
-    <div className="settings-panel">
+    <div className="settings-panel" ref={panelRef}>
       <button className="btn settings-toggle" onClick={() => setOpen(!open)}>
         {open ? 'Hide Settings' : 'Settings'}
       </button>
