@@ -64,12 +64,10 @@ export default function TaskRow({
 
   const handleAddBlocker = async (data: { blockedByTaskId?: number; blockedUntilDate?: string }) => {
     await onAddBlocker(task.id, data);
-    await onReload();
   };
 
   const handleRemoveBlocker = async (blockerId: number) => {
     await onRemoveBlocker(blockerId, task.id);
-    await onReload();
   };
 
   return (

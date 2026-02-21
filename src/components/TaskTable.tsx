@@ -23,9 +23,18 @@ export default function TaskTable({
   onUpdate, onComplete, onUncomplete, onDelete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onReload,
 }: Props) {
+  const TAB_LABELS: Record<TabName, string> = {
+    tasks: 'tasks',
+    backlog: 'backlog tasks',
+    ideas: 'ideas',
+    blocked: 'blocked tasks',
+    completed: 'completed tasks',
+    archive: 'archived tasks',
+  };
+
   if (loading) return <div className="loading">Loading...</div>;
   if (tasks.length === 0) {
-    return <div className="empty">No {activeTab} yet.</div>;
+    return <div className="empty">No {TAB_LABELS[activeTab]} yet.</div>;
   }
 
   return (

@@ -8,8 +8,10 @@ interface Props {
 
 const TABS: { key: TabName; label: string }[] = [
   { key: 'tasks', label: 'Tasks' },
+  { key: 'backlog', label: 'Backlog' },
   { key: 'ideas', label: 'Ideas' },
   { key: 'blocked', label: 'Blocked' },
+  { key: 'completed', label: 'Completed' },
   { key: 'archive', label: 'Archive' },
 ];
 

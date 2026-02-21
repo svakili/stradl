@@ -23,4 +23,4 @@ export interface Settings {
   globalTimeOffset: number;
 }
 
-export type TabName = 'tasks' | 'ideas' | 'blocked' | 'archive';
+export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive';
