@@ -15,13 +15,12 @@ interface Props {
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
   onRemoveBlocker: (blockerId: number, taskId: number) => Promise<void>;
-  onReload: () => Promise<void>;
 }
 
 export default function TaskTable({
   tasks, settings, allTasks, blockers, activeTab, loading,
   onUpdate, onComplete, onUncomplete, onDelete,
-  onLoadBlockers, onAddBlocker, onRemoveBlocker, onReload,
+  onLoadBlockers, onAddBlocker, onRemoveBlocker,
 }: Props) {
   const TAB_LABELS: Record<TabName, string> = {
     tasks: 'tasks',
@@ -53,7 +52,6 @@ export default function TaskTable({
           onLoadBlockers={onLoadBlockers}
           onAddBlocker={onAddBlocker}
           onRemoveBlocker={onRemoveBlocker}
-          onReload={onReload}
         />
       ))}
     </div>

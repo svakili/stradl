@@ -107,7 +107,6 @@ export default function App() {
         onLoadBlockers={loadForTask}
         onAddBlocker={handleAddBlocker}
         onRemoveBlocker={handleRemoveBlocker}
-        onReload={handleReload}
       />
     </div>
   );
