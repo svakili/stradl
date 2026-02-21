@@ -7,6 +7,7 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   isArchived: boolean;
+  isDeleted: boolean;
 }
 
 export interface Blocker {
@@ -23,4 +24,4 @@ export interface Settings {
   globalTimeOffset: number;
 }
 
-export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive';
+export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive' | 'trash';
