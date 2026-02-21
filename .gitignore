@@ -1,0 +1,7 @@
+node_modules
+dist
+server/dist
+data/tasks.json
+data/server.log
+data/server-error.log
+*.tsbuildinfo

@@ -1,0 +1,31 @@
+import type { TabName } from '../types';
+
+interface Props {
+  activeTab: TabName;
+  onTabChange: (tab: TabName) => void;
+  counts: Record<TabName, number>;
+}
+
+const TABS: { key: TabName; label: string }[] = [
+  { key: 'tasks', label: 'Tasks' },
+  { key: 'ideas', label: 'Ideas' },
+  { key: 'blocked', label: 'Blocked' },
+  { key: 'archive', label: 'Archive' },
+];
+
+export default function TabBar({ activeTab, onTabChange, counts }: Props) {
+  return (
+    <div className="tab-bar">
+      {TABS.map(({ key, label }) => (
+        <button
+          key={key}
+          className={`tab ${activeTab === key ? 'tab-active' : ''}`}
+          onClick={() => onTabChange(key)}
+        >
+          {label}
+          <span className="tab-count">{counts[key]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
