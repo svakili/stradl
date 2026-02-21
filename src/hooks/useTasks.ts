@@ -23,7 +23,7 @@ export function useTasks(tab: TabName) {
     await reload();
   };
 
-  const update = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => {
+  const update = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => {
     await api.updateTask(id, data);
     await reload();
   };
@@ -43,5 +43,10 @@ export function useTasks(tab: TabName) {
     await reload();
   };
 
-  return { tasks, loading, reload, create, update, complete, uncomplete, remove };
+  const permanentRemove = async (id: number) => {
+    await api.permanentDeleteTask(id);
+    await reload();
+  };
+
+  return { tasks, loading, reload, create, update, complete, uncomplete, remove, permanentRemove };
 }

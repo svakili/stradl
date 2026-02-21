@@ -11,17 +11,17 @@ import SettingsPanel from './components/SettingsPanel';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabName>('tasks');
-  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 });
+  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0, trash: 0 });
   const [allTasks, setAllTasks] = useState<Task[]>([]);
 
-  const { tasks, loading, reload, create, update, complete, uncomplete, remove } = useTasks(activeTab);
+  const { tasks, loading, reload, create, update, complete, uncomplete, remove, permanentRemove } = useTasks(activeTab);
   const { settings, update: updateSettings } = useSettings();
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
 
   const loadCounts = useCallback(async () => {
-    const tabs: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed', 'archive'];
+    const tabs: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed', 'archive', 'trash'];
     const results = await Promise.all(tabs.map(t => api.fetchTasks(t)));
-    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 };
+    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0, trash: 0 };
     tabs.forEach((t, i) => { newCounts[t] = results[i].length; });
     setCounts(newCounts);
     // Collect all tasks for blocker form dropdowns
@@ -42,7 +42,7 @@ export default function App() {
     await loadCounts();
   };
 
-  const handleUpdate = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => {
+  const handleUpdate = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => {
     await update(id, data);
     await loadCounts();
   };
@@ -59,6 +59,11 @@ export default function App() {
 
   const handleDelete = async (id: number) => {
     await remove(id);
+    await loadCounts();
+  };
+
+  const handlePermanentDelete = async (id: number) => {
+    await permanentRemove(id);
     await loadCounts();
   };
 
@@ -107,6 +112,7 @@ export default function App() {
         onLoadBlockers={loadForTask}
         onAddBlocker={handleAddBlocker}
         onRemoveBlocker={handleRemoveBlocker}
+        onPermanentDelete={handlePermanentDelete}
       />
     </div>
   );

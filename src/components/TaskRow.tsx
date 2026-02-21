@@ -10,13 +10,14 @@ interface Props {
   settings: Settings;
   allTasks: Task[];
   blockers: Blocker[];
-  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
+  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
   onRemoveBlocker: (blockerId: number, taskId: number) => Promise<void>;
+  onPermanentDelete: (id: number) => Promise<void>;
 }
 
 const ROW_COLORS: Record<string, string> = {
@@ -28,7 +29,7 @@ const ROW_COLORS: Record<string, string> = {
 export default function TaskRow({
   task, settings, allTasks, blockers,
   onUpdate, onComplete, onUncomplete, onDelete,
-  onLoadBlockers, onAddBlocker, onRemoveBlocker,
+  onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingStatus, setEditingStatus] = useState(false);
@@ -128,18 +129,31 @@ export default function TaskRow({
         </div>
 
         <div className="task-actions">
-          {task.completedAt ? (
-            <button className="btn btn-sm" onClick={() => onUncomplete(task.id)}>Undo</button>
+          {task.isDeleted ? (
+            <>
+              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isDeleted: false })}>Restore</button>
+              <button className="btn btn-sm btn-danger" onClick={() => {
+                if (window.confirm('Permanently delete this task? This cannot be undone.')) {
+                  onPermanentDelete(task.id);
+                }
+              }}>Permanently Delete</button>
+            </>
           ) : (
-            <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)}>Done</button>
+            <>
+              {task.completedAt ? (
+                <button className="btn btn-sm" onClick={() => onUncomplete(task.id)}>Undo</button>
+              ) : (
+                <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)}>Done</button>
+              )}
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })}>
+                {task.isArchived ? 'Unarchive' : 'Archive'}
+              </button>
+              <button className="btn btn-sm" onClick={toggleBlockers}>
+                Blockers
+              </button>
+              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)}>Delete</button>
+            </>
           )}
-          <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })}>
-            {task.isArchived ? 'Unarchive' : 'Archive'}
-          </button>
-          <button className="btn btn-sm" onClick={toggleBlockers}>
-            Blockers
-          </button>
-          <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)}>Delete</button>
         </div>
       </div>
 

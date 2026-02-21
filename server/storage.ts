@@ -15,6 +15,7 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   isArchived: boolean;
+  isDeleted: boolean;
 }
 
 export interface Blocker {
