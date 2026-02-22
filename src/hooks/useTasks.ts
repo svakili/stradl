@@ -6,17 +6,27 @@ export function useTasks(tab: TabName) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await api.fetchTasks(tab);
       setTasks(data);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [tab]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { void reload(); }, [reload]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void reload(true);
+      }
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, [reload]);
 
   const create = async (data: { title: string; status?: string; priority?: string | null }) => {
     await api.createTask(data);

@@ -8,6 +8,8 @@ import BlockerForm from './BlockerForm';
 interface Props {
   task: Task;
   settings: Settings;
+  showStaleness: boolean;
+  isPending: boolean;
   allTasks: Task[];
   blockers: Blocker[];
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
@@ -27,7 +29,7 @@ const ROW_COLORS: Record<string, string> = {
 };
 
 export default function TaskRow({
-  task, settings, allTasks, blockers,
+  task, settings, showStaleness, isPending, allTasks, blockers,
   onUpdate, onComplete, onUncomplete, onDelete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
@@ -38,7 +40,7 @@ export default function TaskRow({
   const [showBlockers, setShowBlockers] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const stale = isStale(task.updatedAt, settings);
+  const stale = showStaleness && isStale(task.updatedAt, settings);
   const bgColor = stale ? '#e9d5ff' : (task.priority ? ROW_COLORS[task.priority] : '#f3f4f6');
 
   // Sync status value from prop when not editing
@@ -63,7 +65,11 @@ export default function TaskRow({
   const saveTitle = async () => {
     setEditingTitle(false);
     if (titleValue.trim() && titleValue !== task.title) {
-      await onUpdate(task.id, { title: titleValue.trim() });
+      try {
+        await onUpdate(task.id, { title: titleValue.trim() });
+      } catch {
+        setTitleValue(task.title);
+      }
     } else {
       setTitleValue(task.title);
     }
@@ -73,7 +79,11 @@ export default function TaskRow({
     setEditingStatus(false);
     const trimmed = statusValue.trim();
     if (trimmed !== task.status) {
-      await onUpdate(task.id, { status: trimmed });
+      try {
+        await onUpdate(task.id, { status: trimmed });
+      } catch {
+        setStatusValue(task.status);
+      }
     } else {
       setStatusValue(task.status);
     }
@@ -99,13 +109,23 @@ export default function TaskRow({
     await onRemoveBlocker(blockerId, task.id);
   };
 
+  const openTitleEditor = () => {
+    if (!isPending) setEditingTitle(true);
+  };
+
+  const openStatusEditor = () => {
+    if (!isPending) setEditingStatus(true);
+  };
+
   return (
-    <div className="task-row" style={{ backgroundColor: bgColor }}>
+    <div className={`task-row ${isPending ? 'task-row-pending' : ''}`} style={{ backgroundColor: bgColor }} aria-busy={isPending}>
       <div className="task-row-main">
         <select
           value={task.priority || ''}
           onChange={e => onUpdate(task.id, { priority: (e.target.value || null) as Task['priority'] })}
           className="priority-select"
+          aria-label={`Priority for ${task.title}`}
+          disabled={isPending}
         >
           <option value="">Idea</option>
           <option value="P0">P0</option>
@@ -113,15 +133,34 @@ export default function TaskRow({
           <option value="P2">P2</option>
         </select>
 
-        <div className="task-title" onClick={() => setEditingTitle(true)}>
+        <div
+          className="task-title"
+          role="button"
+          tabIndex={isPending ? -1 : 0}
+          onClick={openTitleEditor}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              openTitleEditor();
+            }
+          }}
+          aria-label={`Edit title for ${task.title}`}
+        >
           {editingTitle ? (
             <input
               autoFocus
               value={titleValue}
               onChange={e => setTitleValue(e.target.value)}
-              onBlur={saveTitle}
-              onKeyDown={e => e.key === 'Enter' && saveTitle()}
+              onBlur={() => { void saveTitle(); }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void saveTitle();
+                }
+              }}
               className="inline-edit"
+              disabled={isPending}
             />
           ) : (
             <span>{task.title}</span>
@@ -131,27 +170,27 @@ export default function TaskRow({
         <div className="task-actions">
           {task.isDeleted ? (
             <>
-              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isDeleted: false })}>Restore</button>
+              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isDeleted: false })} disabled={isPending} aria-label={`Restore ${task.title}`}>Restore</button>
               <button className="btn btn-sm btn-danger" onClick={() => {
                 if (window.confirm('Permanently delete this task? This cannot be undone.')) {
                   onPermanentDelete(task.id);
                 }
-              }}>Permanently Delete</button>
+              }} disabled={isPending} aria-label={`Permanently delete ${task.title}`}>Permanently Delete</button>
             </>
           ) : (
             <>
               {task.completedAt ? (
-                <button className="btn btn-sm" onClick={() => onUncomplete(task.id)}>Undo</button>
+                <button className="btn btn-sm" onClick={() => onUncomplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as not completed`}>Undo</button>
               ) : (
-                <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)}>Done</button>
+                <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
               )}
-              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })}>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })} disabled={isPending} aria-label={`${task.isArchived ? 'Unarchive' : 'Archive'} ${task.title}`}>
                 {task.isArchived ? 'Unarchive' : 'Archive'}
               </button>
-              <button className="btn btn-sm" onClick={toggleBlockers}>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>
                 Blockers
               </button>
-              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)}>Delete</button>
+              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
             </>
           )}
         </div>
@@ -159,9 +198,19 @@ export default function TaskRow({
 
       <div
         className="task-status-section"
+        role="button"
+        tabIndex={isPending ? -1 : 0}
+        aria-label={`Edit status for ${task.title}`}
         onClick={(e) => {
           if ((e.target as HTMLElement).tagName === 'A') return;
-          setEditingStatus(true);
+          openStatusEditor();
+        }}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openStatusEditor();
+          }
         }}
       >
         {editingStatus ? (
@@ -177,7 +226,7 @@ export default function TaskRow({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
-                  saveStatus();
+                  void saveStatus();
                 }
                 if (e.key === 'Escape') {
                   cancelStatusEdit();
@@ -185,10 +234,11 @@ export default function TaskRow({
               }}
               className="inline-edit status-textarea"
               placeholder="Add status or notes..."
+              disabled={isPending}
             />
             <div className="status-edit-actions">
-              <button className="btn btn-sm btn-primary" onClick={saveStatus}>Save</button>
-              <button className="btn btn-sm" onClick={cancelStatusEdit}>Cancel</button>
+              <button className="btn btn-sm btn-primary" onClick={() => { void saveStatus(); }} disabled={isPending}>Save</button>
+              <button className="btn btn-sm" onClick={cancelStatusEdit} disabled={isPending}>Cancel</button>
               <span className="status-edit-hint">Ctrl+Enter to save · Esc to cancel</span>
             </div>
           </div>
@@ -209,10 +259,12 @@ export default function TaskRow({
             blockers={blockers.filter(b => !b.resolved)}
             allTasks={allTasks}
             onRemove={handleRemoveBlocker}
+            isDisabled={isPending}
           />
           <BlockerForm
             taskId={task.id}
             allTasks={allTasks}
+            isDisabled={isPending}
             onAdd={handleAddBlocker}
           />
         </div>
