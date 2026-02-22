@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Task, Settings, Blocker } from '../types';
+import type { Task, Settings, Blocker, TabName } from '../types';
 import { isStale } from '../utils/staleness';
 import { linkifyText } from '../utils/linkify';
+import { relativeTime } from '../utils/relativeTime';
 import BlockerList from './BlockerList';
 import BlockerForm from './BlockerForm';
 
@@ -12,6 +13,8 @@ interface Props {
   isPending: boolean;
   allTasks: Task[];
   blockers: Blocker[];
+  activeTab: TabName;
+  recentlyUpdated?: boolean;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
@@ -23,13 +26,13 @@ interface Props {
 }
 
 const ROW_COLORS: Record<string, string> = {
-  P0: '#fee2e2',
-  P1: '#fef9c3',
-  P2: '#dcfce7',
+  P0: 'var(--row-p0)',
+  P1: 'var(--row-p1)',
+  P2: 'var(--row-p2)',
 };
 
 export default function TaskRow({
-  task, settings, showStaleness, isPending, allTasks, blockers,
+  task, settings, showStaleness, isPending, allTasks, blockers, activeTab, recentlyUpdated,
   onUpdate, onComplete, onUncomplete, onDelete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
@@ -37,11 +40,11 @@ export default function TaskRow({
   const [editingStatus, setEditingStatus] = useState(false);
   const [titleValue, setTitleValue] = useState(task.title);
   const [statusValue, setStatusValue] = useState(task.status);
-  const [showBlockers, setShowBlockers] = useState(false);
+  const [showBlockers, setShowBlockers] = useState(activeTab === 'blocked');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const stale = showStaleness && isStale(task.updatedAt, settings);
-  const bgColor = stale ? '#e9d5ff' : (task.priority ? ROW_COLORS[task.priority] : '#f3f4f6');
+  const bgColor = stale ? 'var(--row-stale)' : (task.priority ? ROW_COLORS[task.priority] : 'var(--row-idea)');
 
   // Sync status value from prop when not editing
   useEffect(() => {
@@ -117,8 +120,18 @@ export default function TaskRow({
     if (!isPending) setEditingStatus(true);
   };
 
+  const timestamp = activeTab === 'completed' && task.completedAt
+    ? `Completed ${relativeTime(task.completedAt)}`
+    : `Updated ${relativeTime(task.updatedAt)}`;
+
+  const rowClasses = [
+    'task-row',
+    isPending ? 'task-row-pending' : '',
+    recentlyUpdated ? 'task-row-highlight' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={`task-row ${isPending ? 'task-row-pending' : ''}`} style={{ backgroundColor: bgColor }} aria-busy={isPending}>
+    <div className={rowClasses} style={{ backgroundColor: bgColor }} aria-busy={isPending}>
       <div className="task-row-main">
         <select
           value={task.priority || ''}
@@ -177,19 +190,27 @@ export default function TaskRow({
                 }
               }} disabled={isPending} aria-label={`Permanently delete ${task.title}`}>Permanently Delete</button>
             </>
+          ) : activeTab === 'completed' ? (
+            <>
+              <button className="btn btn-sm" onClick={() => onUncomplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as not completed`}>Undo</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
+            </>
+          ) : activeTab === 'archive' ? (
+            <>
+              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isArchived: false })} disabled={isPending} aria-label={`Unarchive ${task.title}`}>Unarchive</button>
+              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
+            </>
+          ) : activeTab === 'ideas' ? (
+            <>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
+            </>
           ) : (
             <>
-              {task.completedAt ? (
-                <button className="btn btn-sm" onClick={() => onUncomplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as not completed`}>Undo</button>
-              ) : (
-                <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
-              )}
-              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })} disabled={isPending} aria-label={`${task.isArchived ? 'Unarchive' : 'Archive'} ${task.title}`}>
-                {task.isArchived ? 'Unarchive' : 'Archive'}
-              </button>
-              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>
-                Blockers
-              </button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Blockers</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
               <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
             </>
           )}
@@ -252,6 +273,8 @@ export default function TaskRow({
           </div>
         )}
       </div>
+
+      <div className="task-timestamp">{timestamp}</div>
 
       {showBlockers && (
         <div className="task-blockers">

@@ -138,6 +138,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
               disabled={saving}
             />
           </label>
+          <p className="settings-help">Tasks not updated within this time turn purple on the Tasks tab.</p>
           {errors.staleThresholdHours && <p className="settings-error">{errors.staleThresholdHours}</p>}
           <label className="settings-field">
             <span>Top N tasks shown</span>
@@ -149,6 +150,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
               disabled={saving}
             />
           </label>
+          <p className="settings-help">How many prioritized tasks show on Tasks. The rest go to Backlog.</p>
           {errors.topN && <p className="settings-error">{errors.topN}</p>}
           <label className="settings-field">
             <span>Vacation offset (hours)</span>
@@ -160,6 +162,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
               disabled={saving}
             />
           </label>
+          <p className="settings-help">Extra hours added to the stale threshold while you're away.</p>
           {errors.globalTimeOffset && <p className="settings-error">{errors.globalTimeOffset}</p>}
           {submitError && <p className="settings-submit-error">{submitError}</p>}
           <div className="settings-actions">
