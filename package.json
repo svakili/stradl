@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "install-service": "node scripts/install-service.js",
     "uninstall-service": "node scripts/uninstall-service.js",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major",
     "test": "vitest run --config vitest.config.server.ts",
     "test:watch": "vitest --config vitest.config.server.ts"
   },
