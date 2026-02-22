@@ -9,6 +9,7 @@ interface Props {
   pendingActionByTaskId: Record<number, boolean>;
   activeTab: TabName;
   loading: boolean;
+  recentlyUpdatedIds?: Set<number>;
   onTabChange: (tab: TabName) => void;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
@@ -21,8 +22,8 @@ interface Props {
 }
 
 export default function TaskTable({
-  tasks, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, onTabChange,
-  onUpdate, onComplete, onUncomplete, onDelete,
+  tasks, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
+  onTabChange, onUpdate, onComplete, onUncomplete, onDelete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
   const showStaleness = activeTab === 'tasks';
@@ -92,6 +93,8 @@ export default function TaskTable({
           isPending={Boolean(pendingActionByTaskId[task.id])}
           allTasks={allTasks}
           blockers={blockers[task.id] || []}
+          activeTab={activeTab}
+          recentlyUpdated={recentlyUpdatedIds?.has(task.id)}
           onUpdate={onUpdate}
           onComplete={onComplete}
           onUncomplete={onUncomplete}

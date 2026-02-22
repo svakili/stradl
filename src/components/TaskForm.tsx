@@ -37,7 +37,7 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
       <input
         ref={titleInputRef}
         type="text"
-        placeholder={activeTab === 'ideas' ? 'New idea...' : 'New task...'}
+        placeholder={activeTab === 'ideas' ? 'New idea...' : 'New task... (press / to focus)'}
         value={title}
         onChange={e => setTitle(e.target.value)}
         className="task-form-input"
