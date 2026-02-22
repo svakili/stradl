@@ -572,6 +572,25 @@ textarea:focus-visible,
   margin-top: 0.5rem;
 }
 
+.settings-updates-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.settings-updates-title {
+  font-size: 0.8125rem;
+  margin-bottom: 0.25rem;
+}
+
+.settings-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 /* Dark Mode Toggle */
 .theme-toggle {
   border: none;
@@ -608,6 +627,11 @@ textarea:focus-visible,
 
 .empty-state-action {
   margin: 0 auto;
+}
+
+.search-empty-state-query {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 /* Toast Container & Items */
@@ -648,6 +672,10 @@ textarea:focus-visible,
 
 .toast-error {
   border-color: var(--red-border);
+}
+
+.toast-info {
+  border-color: var(--blue-100);
 }
 
 .toast-actions {
@@ -829,6 +857,11 @@ textarea:focus-visible,
     left: 0;
     right: 0;
     min-width: 0;
+  }
+
+  .settings-update-actions .btn {
+    width: 100%;
+    text-align: center;
   }
 
   .toast-container {

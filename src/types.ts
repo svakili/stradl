@@ -24,4 +24,14 @@ export interface Settings {
   globalTimeOffset: number;
 }
 
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseUrl: string;
+  releaseName: string;
+  publishedAt: string;
+  checkedAt: string;
+}
+
 export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive' | 'trash';

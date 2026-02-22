@@ -3,6 +3,7 @@ import type { TabName, Task, Settings } from './types';
 import { useTasks } from './hooks/useTasks';
 import { useSettings } from './hooks/useSettings';
 import { useBlockers } from './hooks/useBlockers';
+import { useUpdateCheck, LAST_NOTIFIED_VERSION_KEY } from './hooks/useUpdateCheck';
 import * as api from './api';
 import TabBar from './components/TabBar';
 import TaskTable from './components/TaskTable';
@@ -11,7 +12,7 @@ import SettingsPanel from './components/SettingsPanel';
 
 interface ToastState {
   id: number;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
   message: string;
   onUndo?: () => void;
 }
@@ -45,6 +46,14 @@ export default function App() {
   const { tasks, loading, reload, create, update, complete, uncomplete, remove, permanentRemove } = useTasks(activeTab);
   const { settings, update: updateSettings } = useSettings();
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
+  const {
+    isChecking: isCheckingUpdates,
+    lastResult: updateCheckResult,
+    lastCheckedAt: updateLastCheckedAt,
+    error: updateCheckError,
+    checkNow: runUpdateCheck,
+    maybeAutoCheck,
+  } = useUpdateCheck();
 
   // Apply theme to document
   useEffect(() => {
@@ -56,11 +65,6 @@ export default function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   }, []);
 
-  // Clear search when switching tabs
-  useEffect(() => {
-    setSearchQuery('');
-  }, [activeTab]);
-
   // Filter tasks by search query
   const filteredTasks = useMemo(() => {
     if (!searchQuery.trim()) return tasks;
@@ -69,8 +73,9 @@ export default function App() {
       t.title.toLowerCase().includes(q) || t.status.toLowerCase().includes(q)
     );
   }, [tasks, searchQuery]);
+  const hasActiveSearch = searchQuery.trim().length > 0;
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success', onUndo?: () => void) => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success', onUndo?: () => void) => {
     const id = Date.now();
     setToasts(prev => {
       const next = [...prev, { id, type, message, onUndo }];
@@ -90,6 +95,25 @@ export default function App() {
     );
     return () => timers.forEach(clearTimeout);
   }, [toasts, dismissToast]);
+
+  useEffect(() => {
+    void maybeAutoCheck();
+  }, [maybeAutoCheck]);
+
+  useEffect(() => {
+    if (!updateCheckResult?.hasUpdate) return;
+    try {
+      const lastNotified = localStorage.getItem(LAST_NOTIFIED_VERSION_KEY);
+      if (lastNotified === updateCheckResult.latestVersion) return;
+      localStorage.setItem(LAST_NOTIFIED_VERSION_KEY, updateCheckResult.latestVersion);
+    } catch {
+      // Ignore storage errors and still show one-time in-session toast.
+    }
+    showToast(
+      `Update available: v${updateCheckResult.latestVersion}. Open Settings to view release notes.`,
+      'info'
+    );
+  }, [updateCheckResult, showToast]);
 
   // Mark a task as recently updated (highlight animation)
   const markRecentlyUpdated = useCallback((taskId: number) => {
@@ -307,6 +331,14 @@ export default function App() {
     }
   };
 
+  const handleCheckForUpdates = async () => {
+    try {
+      await runUpdateCheck({ manual: true });
+    } catch (error) {
+      showToast(`Update check failed: ${getErrorMessage(error)}`, 'error');
+    }
+  };
+
   const showForm = activeTab === 'tasks' || activeTab === 'ideas';
 
   return (
@@ -333,7 +365,15 @@ export default function App() {
           <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
             {theme === 'light' ? '\u263E' : '\u2600'}
           </button>
-          <SettingsPanel settings={settings} onSave={handleSaveSettings} />
+          <SettingsPanel
+            settings={settings}
+            onSave={handleSaveSettings}
+            updateCheckResult={updateCheckResult}
+            updateCheckError={updateCheckError}
+            updateLastCheckedAt={updateLastCheckedAt}
+            isCheckingUpdates={isCheckingUpdates}
+            onCheckForUpdates={handleCheckForUpdates}
+          />
         </div>
       </header>
 
@@ -345,6 +385,8 @@ export default function App() {
 
       <TaskTable
         tasks={filteredTasks}
+        searchQuery={searchQuery}
+        hasActiveSearch={hasActiveSearch}
         settings={settings}
         allTasks={allTasks}
         blockers={blockers}
@@ -361,6 +403,7 @@ export default function App() {
         onAddBlocker={handleAddBlocker}
         onRemoveBlocker={handleRemoveBlocker}
         onPermanentDelete={handlePermanentDelete}
+        onClearSearch={() => setSearchQuery('')}
       />
 
       {toasts.length > 0 && (

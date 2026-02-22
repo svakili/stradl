@@ -41,6 +41,7 @@ export default function TaskRow({
   const [titleValue, setTitleValue] = useState(task.title);
   const [statusValue, setStatusValue] = useState(task.status);
   const [showBlockers, setShowBlockers] = useState(activeTab === 'blocked');
+  const skipNextTitleBlurSaveRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const stale = showStaleness && isStale(task.updatedAt, settings);
@@ -76,6 +77,12 @@ export default function TaskRow({
     } else {
       setTitleValue(task.title);
     }
+  };
+
+  const cancelTitleEdit = () => {
+    skipNextTitleBlurSaveRef.current = true;
+    setEditingTitle(false);
+    setTitleValue(task.title);
   };
 
   const saveStatus = async () => {
@@ -165,11 +172,21 @@ export default function TaskRow({
               autoFocus
               value={titleValue}
               onChange={e => setTitleValue(e.target.value)}
-              onBlur={() => { void saveTitle(); }}
+              onBlur={() => {
+                if (skipNextTitleBlurSaveRef.current) {
+                  skipNextTitleBlurSaveRef.current = false;
+                  return;
+                }
+                void saveTitle();
+              }}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   void saveTitle();
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelTitleEdit();
                 }
               }}
               className="inline-edit"
@@ -223,6 +240,7 @@ export default function TaskRow({
         tabIndex={isPending ? -1 : 0}
         aria-label={`Edit status for ${task.title}`}
         onClick={(e) => {
+          if (editingStatus) return;
           if ((e.target as HTMLElement).tagName === 'A') return;
           openStatusEditor();
         }}

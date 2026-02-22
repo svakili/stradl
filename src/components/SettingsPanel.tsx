@@ -1,9 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import type { Settings } from '../types';
+import type { Settings, UpdateCheckResult } from '../types';
 
 interface Props {
   settings: Settings;
   onSave: (data: Settings) => Promise<void>;
+  updateCheckResult: UpdateCheckResult | null;
+  updateCheckError: string | null;
+  updateLastCheckedAt: string | null;
+  isCheckingUpdates: boolean;
+  onCheckForUpdates: () => Promise<void>;
 }
 
 interface SettingsDraft {
@@ -26,7 +31,15 @@ function toDraft(settings: Settings): SettingsDraft {
   };
 }
 
-export default function SettingsPanel({ settings, onSave }: Props) {
+export default function SettingsPanel({
+  settings,
+  onSave,
+  updateCheckResult,
+  updateCheckError,
+  updateLastCheckedAt,
+  isCheckingUpdates,
+  onCheckForUpdates,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<SettingsDraft>(toDraft(settings));
@@ -120,6 +133,12 @@ export default function SettingsPanel({ settings, onSave }: Props) {
     setOpen(false);
   };
 
+  const updateStatus = updateCheckResult == null
+    ? 'Check for updates to see the latest available release.'
+    : updateCheckResult.hasUpdate
+      ? `Update available: v${updateCheckResult.latestVersion}.`
+      : `You're up to date (v${updateCheckResult.currentVersion}).`;
+
   return (
     <div className="settings-panel" ref={panelRef}>
       <button className="btn settings-toggle" onClick={() => setOpen(!open)}>
@@ -164,6 +183,43 @@ export default function SettingsPanel({ settings, onSave }: Props) {
           </label>
           <p className="settings-help">Extra hours added to the stale threshold while you're away.</p>
           {errors.globalTimeOffset && <p className="settings-error">{errors.globalTimeOffset}</p>}
+
+          <div className="settings-updates-section">
+            <h3 className="settings-updates-title">App Updates</h3>
+            <p className="settings-help">
+              Current version: <strong>{updateCheckResult?.currentVersion || 'Unknown'}</strong>
+            </p>
+            <p className="settings-help">
+              Latest version: <strong>{updateCheckResult?.latestVersion || 'Unknown'}</strong>
+            </p>
+            <p className="settings-help">{updateStatus}</p>
+            {updateLastCheckedAt && (
+              <p className="settings-help">
+                Last checked: {new Date(updateLastCheckedAt).toLocaleString()}
+              </p>
+            )}
+            {updateCheckError && <p className="settings-error">{updateCheckError}</p>}
+            <div className="settings-update-actions">
+              <button
+                className="btn btn-sm"
+                onClick={() => { void onCheckForUpdates(); }}
+                disabled={saving || isCheckingUpdates}
+              >
+                {isCheckingUpdates ? 'Checking...' : 'Check for updates'}
+              </button>
+              {updateCheckResult?.hasUpdate && (
+                <a
+                  className="btn btn-sm"
+                  href={updateCheckResult.releaseUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View release notes
+                </a>
+              )}
+            </div>
+          </div>
+
           {submitError && <p className="settings-submit-error">{submitError}</p>}
           <div className="settings-actions">
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
