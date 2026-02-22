@@ -6,8 +6,10 @@ interface Props {
   settings: Settings;
   allTasks: Task[];
   blockers: Record<number, Blocker[]>;
+  pendingActionByTaskId: Record<number, boolean>;
   activeTab: TabName;
   loading: boolean;
+  onTabChange: (tab: TabName) => void;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
@@ -19,32 +21,75 @@ interface Props {
 }
 
 export default function TaskTable({
-  tasks, settings, allTasks, blockers, activeTab, loading,
+  tasks, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, onTabChange,
   onUpdate, onComplete, onUncomplete, onDelete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
-  const TAB_LABELS: Record<TabName, string> = {
-    tasks: 'tasks',
-    backlog: 'backlog tasks',
-    ideas: 'ideas',
-    blocked: 'blocked tasks',
-    completed: 'completed tasks',
-    archive: 'archived tasks',
-    trash: 'deleted tasks',
+  const showStaleness = activeTab === 'tasks';
+
+  const EMPTY_STATES: Record<TabName, { title: string; description: string; ctaLabel?: string; ctaTab?: TabName }> = {
+    tasks: {
+      title: 'No active tasks',
+      description: 'All clear for now. Review backlog to pull in the next item.',
+      ctaLabel: 'Go to Backlog',
+      ctaTab: 'backlog',
+    },
+    backlog: {
+      title: 'No backlog tasks',
+      description: 'You have no overflow tasks at the moment.',
+    },
+    ideas: {
+      title: 'No ideas yet',
+      description: 'Capture new ideas above so they are ready when needed.',
+    },
+    blocked: {
+      title: 'No blocked tasks',
+      description: 'Everything is currently unblocked.',
+      ctaLabel: 'Review blockers',
+      ctaTab: 'tasks',
+    },
+    completed: {
+      title: 'No completed tasks',
+      description: 'Completed tasks will appear here.',
+    },
+    archive: {
+      title: 'No archived tasks',
+      description: 'Archive items you want to keep but hide from active views.',
+    },
+    trash: {
+      title: 'Trash is empty',
+      description: 'Nothing deleted yet.',
+      ctaLabel: 'Nothing deleted yet',
+      ctaTab: 'tasks',
+    },
   };
 
-  if (loading) return <div className="loading">Loading...</div>;
+  if (loading) return <div className="loading" id={`tab-panel-${activeTab}`} role="tabpanel">Loading...</div>;
   if (tasks.length === 0) {
-    return <div className="empty">No {TAB_LABELS[activeTab]} yet.</div>;
+    const state = EMPTY_STATES[activeTab];
+    const ctaTab = state.ctaTab;
+    return (
+      <div className="empty-state" id={`tab-panel-${activeTab}`} role="tabpanel">
+        <h2 className="empty-state-title">{state.title}</h2>
+        <p className="empty-state-description">{state.description}</p>
+        {state.ctaLabel && ctaTab && (
+          <button className="btn empty-state-action" onClick={() => onTabChange(ctaTab)}>
+            {state.ctaLabel}
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
-    <div className="task-table">
+    <div className="task-table" id={`tab-panel-${activeTab}`} role="tabpanel">
       {tasks.map(task => (
         <TaskRow
           key={task.id}
           task={task}
           settings={settings}
+          showStaleness={showStaleness}
+          isPending={Boolean(pendingActionByTaskId[task.id])}
           allTasks={allTasks}
           blockers={blockers[task.id] || []}
           onUpdate={onUpdate}

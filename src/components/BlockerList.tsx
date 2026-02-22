@@ -4,9 +4,10 @@ interface Props {
   blockers: Blocker[];
   allTasks: Task[];
   onRemove: (blockerId: number) => Promise<void>;
+  isDisabled?: boolean;
 }
 
-export default function BlockerList({ blockers, allTasks, onRemove }: Props) {
+export default function BlockerList({ blockers, allTasks, onRemove, isDisabled = false }: Props) {
   if (blockers.length === 0) {
     return <div className="blocker-empty">No active blockers</div>;
   }
@@ -27,7 +28,7 @@ export default function BlockerList({ blockers, allTasks, onRemove }: Props) {
                   ? `Blocked until: ${new Date(b.blockedUntilDate).toLocaleDateString()}`
                   : 'Unknown blocker'}
             </span>
-            <button className="btn btn-sm btn-danger" onClick={() => onRemove(b.id)}>
+            <button className="btn btn-sm btn-danger" onClick={() => onRemove(b.id)} disabled={isDisabled}>
               Remove
             </button>
           </div>
