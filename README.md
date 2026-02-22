@@ -24,6 +24,27 @@ npm start
 
 Builds the frontend and compiles the server TypeScript, then serves everything from http://localhost:3001.
 
+## Releasing
+
+This project includes one-command release scripts that:
+- ensure you are on a clean `main` branch
+- pull latest `origin/main`
+- bump version + create tag via `npm version`
+- push commit and tag
+- create a GitHub release with generated notes
+
+Use one of:
+
+```bash
+npm run release:patch
+npm run release:minor
+npm run release:major
+```
+
+Notes:
+- Requires `gh` authenticated (`gh auth status`)
+- Release tags are `v<version>` and match `package.json` version
+
 ## Auto-Start on Login (macOS)
 
 ```bash
