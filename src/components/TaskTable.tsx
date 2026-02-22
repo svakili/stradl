@@ -3,6 +3,8 @@ import TaskRow from './TaskRow';
 
 interface Props {
   tasks: Task[];
+  searchQuery: string;
+  hasActiveSearch: boolean;
   settings: Settings;
   allTasks: Task[];
   blockers: Record<number, Blocker[]>;
@@ -19,12 +21,13 @@ interface Props {
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
   onRemoveBlocker: (blockerId: number, taskId: number) => Promise<void>;
   onPermanentDelete: (id: number) => Promise<void>;
+  onClearSearch: () => void;
 }
 
 export default function TaskTable({
-  tasks, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
+  tasks, searchQuery, hasActiveSearch, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
   onTabChange, onUpdate, onComplete, onUncomplete, onDelete,
-  onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
+  onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete, onClearSearch,
 }: Props) {
   const showStaleness = activeTab === 'tasks';
 
@@ -60,13 +63,26 @@ export default function TaskTable({
     trash: {
       title: 'Trash is empty',
       description: 'Nothing deleted yet.',
-      ctaLabel: 'Nothing deleted yet',
-      ctaTab: 'tasks',
     },
   };
 
   if (loading) return <div className="loading" id={`tab-panel-${activeTab}`} role="tabpanel">Loading...</div>;
   if (tasks.length === 0) {
+    if (hasActiveSearch) {
+      const query = searchQuery.trim();
+      return (
+        <div className="empty-state search-empty-state" id={`tab-panel-${activeTab}`} role="tabpanel">
+          <h2 className="empty-state-title">No matches found</h2>
+          <p className="empty-state-description">
+            No tasks match <span className="search-empty-state-query">"{query}"</span> in this tab.
+          </p>
+          <button className="btn empty-state-action" onClick={onClearSearch}>
+            Clear search
+          </button>
+        </div>
+      );
+    }
+
     const state = EMPTY_STATES[activeTab];
     const ctaTab = state.ctaTab;
     return (

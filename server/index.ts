@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { taskRoutes } from './routes/tasks.js';
 import { blockerRoutes } from './routes/blockers.js';
 import { settingsRoutes } from './routes/settings.js';
+import { updateRoutes } from './routes/update.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/api', taskRoutes);
 app.use('/api', blockerRoutes);
 app.use('/api', settingsRoutes);
+app.use('/api', updateRoutes);
 
 // Serve static files in production (Vite build output is at project root /dist)
 // When running compiled JS from server/dist/, go up two levels to project root
