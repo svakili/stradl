@@ -510,6 +510,22 @@ textarea:focus-visible,
   color: var(--text-primary);
 }
 
+.duration-presets {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-outline {
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: var(--border-default);
+}
+
 /* Settings */
 .settings-panel {
   position: relative;
