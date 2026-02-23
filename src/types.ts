@@ -21,7 +21,9 @@ export interface Blocker {
 export interface Settings {
   staleThresholdHours: number;
   topN: number;
-  globalTimeOffset: number;
+  oneTimeOffsetHours: number;
+  oneTimeOffsetExpiresAt: string | null;
+  vacationPromptLastShownForUpdatedAt: string | null;
 }
 
 export interface UpdateCheckResult {

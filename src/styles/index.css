@@ -709,6 +709,65 @@ textarea:focus-visible,
   padding: 0;
 }
 
+/* Vacation Nudge Modal */
+.vacation-nudge-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--shortcut-overlay);
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vacation-nudge-dialog {
+  background: var(--shortcut-dialog-bg);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  width: min(460px, calc(100vw - 1.5rem));
+  box-shadow: 0 8px 24px var(--shadow-lg);
+}
+
+.vacation-nudge-dialog h2 {
+  font-size: 1.0625rem;
+  margin-bottom: 0.5rem;
+}
+
+.vacation-nudge-copy {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.vacation-nudge-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.vacation-nudge-field span {
+  font-size: 0.8125rem;
+}
+
+.vacation-nudge-field input {
+  width: 88px;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.25rem;
+  text-align: right;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.vacation-nudge-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.875rem;
+}
+
 /* Keyboard Shortcut Overlay */
 .shortcut-overlay {
   position: fixed;
@@ -862,6 +921,25 @@ textarea:focus-visible,
   .settings-update-actions .btn {
     width: 100%;
     text-align: center;
+  }
+
+  .vacation-nudge-field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.375rem;
+  }
+
+  .vacation-nudge-field input {
+    width: 100%;
+    text-align: left;
+  }
+
+  .vacation-nudge-actions {
+    flex-direction: column;
+  }
+
+  .vacation-nudge-actions .btn {
+    width: 100%;
   }
 
   .toast-container {

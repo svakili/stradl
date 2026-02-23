@@ -243,7 +243,16 @@ describe('getPrioritizedTasks', () => {
           createdAt: new Date(2024, 0, i + 1).toISOString(),
         })
       );
-      const data = makeAppData({ tasks, settings: { staleThresholdHours: 48, topN: 20, globalTimeOffset: 0 } });
+      const data = makeAppData({
+        tasks,
+        settings: {
+          staleThresholdHours: 48,
+          topN: 20,
+          oneTimeOffsetHours: 0,
+          oneTimeOffsetExpiresAt: null,
+          vacationPromptLastShownForUpdatedAt: null,
+        },
+      });
 
       const prioritized = getPrioritizedTasks(data);
       const tasksTab = prioritized.slice(0, 20);
@@ -262,7 +271,16 @@ describe('getPrioritizedTasks', () => {
           makeTask({ id: i + 6, priority: 'P1', createdAt: new Date(2024, 0, i + 1).toISOString() })
         ),
       ];
-      const data = makeAppData({ tasks, settings: { staleThresholdHours: 48, topN: 20, globalTimeOffset: 0 } });
+      const data = makeAppData({
+        tasks,
+        settings: {
+          staleThresholdHours: 48,
+          topN: 20,
+          oneTimeOffsetHours: 0,
+          oneTimeOffsetExpiresAt: null,
+          vacationPromptLastShownForUpdatedAt: null,
+        },
+      });
 
       const prioritized = getPrioritizedTasks(data);
       const tasksTab = prioritized.slice(0, 20);

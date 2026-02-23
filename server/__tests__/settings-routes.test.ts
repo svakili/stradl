@@ -50,7 +50,9 @@ describe('GET /settings', () => {
     const settings = res.json.mock.calls[0][0];
     expect(settings.staleThresholdHours).toBe(48);
     expect(settings.topN).toBe(20);
-    expect(settings.globalTimeOffset).toBe(0);
+    expect(settings.oneTimeOffsetHours).toBe(0);
+    expect(settings.oneTimeOffsetExpiresAt).toBeNull();
+    expect(settings.vacationPromptLastShownForUpdatedAt).toBeNull();
   });
 });
 
@@ -67,7 +69,9 @@ describe('PUT /settings', () => {
     const settings = res.json.mock.calls[0][0];
     expect(settings.topN).toBe(10);
     expect(settings.staleThresholdHours).toBe(48); // unchanged
-    expect(settings.globalTimeOffset).toBe(0); // unchanged
+    expect(settings.oneTimeOffsetHours).toBe(0); // unchanged
+    expect(settings.oneTimeOffsetExpiresAt).toBeNull(); // unchanged
+    expect(settings.vacationPromptLastShownForUpdatedAt).toBeNull(); // unchanged
   });
 
   it('updates multiple fields at once', () => {
@@ -82,14 +86,22 @@ describe('PUT /settings', () => {
     expect(settings.staleThresholdHours).toBe(24);
   });
 
-  it('updates globalTimeOffset', () => {
+  it('updates one-time offset fields', () => {
     const data = makeAppData();
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
-    handler(mockReq({ body: { globalTimeOffset: 72 } }), res);
+    handler(mockReq({
+      body: {
+        oneTimeOffsetHours: 72,
+        oneTimeOffsetExpiresAt: '2026-02-24T23:59:59.999Z',
+        vacationPromptLastShownForUpdatedAt: '2026-02-20T08:00:00.000Z',
+      },
+    }), res);
 
-    expect(res.json.mock.calls[0][0].globalTimeOffset).toBe(72);
+    expect(res.json.mock.calls[0][0].oneTimeOffsetHours).toBe(72);
+    expect(res.json.mock.calls[0][0].oneTimeOffsetExpiresAt).toBe('2026-02-24T23:59:59.999Z');
+    expect(res.json.mock.calls[0][0].vacationPromptLastShownForUpdatedAt).toBe('2026-02-20T08:00:00.000Z');
   });
 
   it('calls writeData with updated data', () => {
@@ -106,13 +118,17 @@ describe('PUT /settings', () => {
   it('does not modify fields not in the request', () => {
     const data = makeAppData();
     const originalThreshold = data.settings.staleThresholdHours;
-    const originalOffset = data.settings.globalTimeOffset;
+    const originalOneTimeOffset = data.settings.oneTimeOffsetHours;
+    const originalExpiresAt = data.settings.oneTimeOffsetExpiresAt;
+    const originalPromptAnchor = data.settings.vacationPromptLastShownForUpdatedAt;
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
     handler(mockReq({ body: { topN: 30 } }), res);
 
     expect(data.settings.staleThresholdHours).toBe(originalThreshold);
-    expect(data.settings.globalTimeOffset).toBe(originalOffset);
+    expect(data.settings.oneTimeOffsetHours).toBe(originalOneTimeOffset);
+    expect(data.settings.oneTimeOffsetExpiresAt).toBe(originalExpiresAt);
+    expect(data.settings.vacationPromptLastShownForUpdatedAt).toBe(originalPromptAnchor);
   });
 });
