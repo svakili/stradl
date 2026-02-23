@@ -19,13 +19,25 @@ export default function BlockerList({ blockers, allTasks, onRemove, isDisabled =
           ? allTasks.find(t => t.id === b.blockedByTaskId)
           : null;
 
+        const formatBlockedUntil = (iso: string) => {
+          const d = new Date(iso);
+          const now = new Date();
+          const isToday = d.getFullYear() === now.getFullYear()
+            && d.getMonth() === now.getMonth()
+            && d.getDate() === now.getDate();
+          if (isToday) {
+            return `Blocked until ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          }
+          return `Blocked until ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        };
+
         return (
           <div key={b.id} className="blocker-item">
             <span>
               {blockingTask
                 ? `Blocked by: ${blockingTask.title}`
                 : b.blockedUntilDate
-                  ? `Blocked until: ${new Date(b.blockedUntilDate).toLocaleDateString()}`
+                  ? formatBlockedUntil(b.blockedUntilDate)
                   : 'Unknown blocker'}
             </span>
             <button className="btn btn-sm btn-danger" onClick={() => onRemove(b.id)} disabled={isDisabled}>
