@@ -12,11 +12,19 @@ settingsRoutes.get('/settings', (_req, res) => {
 // PUT /api/settings
 settingsRoutes.put('/settings', (req, res) => {
   const data = readData();
-  const { staleThresholdHours, topN, globalTimeOffset } = req.body;
+  const {
+    staleThresholdHours,
+    topN,
+    oneTimeOffsetHours,
+    oneTimeOffsetExpiresAt,
+    vacationPromptLastShownForUpdatedAt,
+  } = req.body;
 
   if (staleThresholdHours !== undefined) data.settings.staleThresholdHours = staleThresholdHours;
   if (topN !== undefined) data.settings.topN = topN;
-  if (globalTimeOffset !== undefined) data.settings.globalTimeOffset = globalTimeOffset;
+  if (oneTimeOffsetHours !== undefined) data.settings.oneTimeOffsetHours = oneTimeOffsetHours;
+  if (oneTimeOffsetExpiresAt !== undefined) data.settings.oneTimeOffsetExpiresAt = oneTimeOffsetExpiresAt;
+  if (vacationPromptLastShownForUpdatedAt !== undefined) data.settings.vacationPromptLastShownForUpdatedAt = vacationPromptLastShownForUpdatedAt;
 
   writeData(data);
   res.json(data.settings);

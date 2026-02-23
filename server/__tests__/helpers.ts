@@ -38,7 +38,9 @@ export function makeAppData(overrides: Partial<AppData> = {}): AppData {
     settings: {
       staleThresholdHours: 48,
       topN: 20,
-      globalTimeOffset: 0,
+      oneTimeOffsetHours: 0,
+      oneTimeOffsetExpiresAt: null,
+      vacationPromptLastShownForUpdatedAt: null,
     },
     nextTaskId: 100,
     nextBlockerId: 100,

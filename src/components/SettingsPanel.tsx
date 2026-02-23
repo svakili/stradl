@@ -3,7 +3,7 @@ import type { Settings, UpdateCheckResult } from '../types';
 
 interface Props {
   settings: Settings;
-  onSave: (data: Settings) => Promise<void>;
+  onSave: (data: Partial<Settings>) => Promise<void>;
   updateCheckResult: UpdateCheckResult | null;
   updateCheckError: string | null;
   updateLastCheckedAt: string | null;
@@ -14,20 +14,17 @@ interface Props {
 interface SettingsDraft {
   staleThresholdHours: string;
   topN: string;
-  globalTimeOffset: string;
 }
 
 interface SettingsErrors {
   staleThresholdHours?: string;
   topN?: string;
-  globalTimeOffset?: string;
 }
 
 function toDraft(settings: Settings): SettingsDraft {
   return {
     staleThresholdHours: String(settings.staleThresholdHours),
     topN: String(settings.topN),
-    globalTimeOffset: String(settings.globalTimeOffset),
   };
 }
 
@@ -67,12 +64,11 @@ export default function SettingsPanel({
     setSubmitError(null);
   }, [settings, open]);
 
-  const validate = (): { nextSettings: Settings | null; nextErrors: SettingsErrors } => {
+  const validate = (): { nextSettings: Partial<Settings> | null; nextErrors: SettingsErrors } => {
     const nextErrors: SettingsErrors = {};
 
     const staleThresholdHours = Number(draft.staleThresholdHours);
     const topN = Number(draft.topN);
-    const globalTimeOffset = Number(draft.globalTimeOffset);
 
     if (!Number.isInteger(staleThresholdHours)) {
       nextErrors.staleThresholdHours = 'Enter a whole number.';
@@ -86,12 +82,6 @@ export default function SettingsPanel({
       nextErrors.topN = 'Must be at least 1.';
     }
 
-    if (!Number.isInteger(globalTimeOffset)) {
-      nextErrors.globalTimeOffset = 'Enter a whole number.';
-    } else if (globalTimeOffset < 0) {
-      nextErrors.globalTimeOffset = 'Must be 0 or greater.';
-    }
-
     if (Object.keys(nextErrors).length > 0) {
       return { nextSettings: null, nextErrors };
     }
@@ -100,7 +90,6 @@ export default function SettingsPanel({
       nextSettings: {
         staleThresholdHours: Math.max(1, staleThresholdHours),
         topN: Math.max(1, topN),
-        globalTimeOffset: Math.max(0, globalTimeOffset),
       },
       nextErrors,
     };
@@ -171,18 +160,7 @@ export default function SettingsPanel({
           </label>
           <p className="settings-help">How many prioritized tasks show on Tasks. The rest go to Backlog.</p>
           {errors.topN && <p className="settings-error">{errors.topN}</p>}
-          <label className="settings-field">
-            <span>Vacation offset (hours)</span>
-            <input
-              type="number"
-              value={draft.globalTimeOffset}
-              onChange={e => setDraft(prev => ({ ...prev, globalTimeOffset: e.target.value }))}
-              min={0}
-              disabled={saving}
-            />
-          </label>
-          <p className="settings-help">Extra hours added to the stale threshold while you're away.</p>
-          {errors.globalTimeOffset && <p className="settings-error">{errors.globalTimeOffset}</p>}
+          <p className="settings-help">Vacation adjustments are handled with an inactivity popup when no active task has been updated recently.</p>
 
           <div className="settings-updates-section">
             <h3 className="settings-updates-title">App Updates</h3>

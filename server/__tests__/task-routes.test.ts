@@ -66,7 +66,13 @@ describe('GET /tasks', () => {
     );
     const data = makeAppData({
       tasks,
-      settings: { staleThresholdHours: 48, topN: 3, globalTimeOffset: 0 },
+      settings: {
+        staleThresholdHours: 48,
+        topN: 3,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+      },
     });
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
@@ -82,7 +88,13 @@ describe('GET /tasks', () => {
     );
     const data = makeAppData({
       tasks,
-      settings: { staleThresholdHours: 48, topN: 3, globalTimeOffset: 0 },
+      settings: {
+        staleThresholdHours: 48,
+        topN: 3,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+      },
     });
     mockedReadData.mockReturnValue(data);
     const res = mockRes();

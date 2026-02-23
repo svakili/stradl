@@ -6,12 +6,19 @@ export function useSettings() {
   const [settings, setSettings] = useState<Settings>({
     staleThresholdHours: 24,
     topN: 20,
-    globalTimeOffset: 0,
+    oneTimeOffsetHours: 0,
+    oneTimeOffsetExpiresAt: null,
+    vacationPromptLastShownForUpdatedAt: null,
   });
+  const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    const data = await api.fetchSettings();
-    setSettings(data);
+    try {
+      const data = await api.fetchSettings();
+      setSettings(data);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
@@ -21,5 +28,5 @@ export function useSettings() {
     setSettings(updated);
   };
 
-  return { settings, reload, update };
+  return { settings, loading, reload, update };
 }

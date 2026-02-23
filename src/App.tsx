@@ -9,6 +9,8 @@ import TabBar from './components/TabBar';
 import TaskTable from './components/TaskTable';
 import TaskForm from './components/TaskForm';
 import SettingsPanel from './components/SettingsPanel';
+import VacationNudgeModal from './components/VacationNudgeModal';
+import { getVacationNudgeRecommendation } from './utils/vacationNudge';
 
 interface ToastState {
   id: number;
@@ -33,6 +35,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<Set<number>>(new Set());
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [hasLoadedCounts, setHasLoadedCounts] = useState(false);
+  const [showVacationNudge, setShowVacationNudge] = useState(false);
+  const [vacationSuggestedDays, setVacationSuggestedDays] = useState(1);
+  const [vacationInactivityDays, setVacationInactivityDays] = useState(1);
+  const [vacationAnchorUpdatedAt, setVacationAnchorUpdatedAt] = useState<string | null>(null);
+  const [vacationNudgeSaving, setVacationNudgeSaving] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('stradl-theme');
     if (saved === 'dark' || saved === 'light') return saved;
@@ -42,9 +50,10 @@ export default function App() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const pendingTaskIdsRef = useRef<Set<number>>(new Set());
   const highlightTimersRef = useRef<Map<number, number>>(new Map());
+  const vacationNudgeEvaluatedRef = useRef(false);
 
   const { tasks, loading, reload, create, update, complete, uncomplete, remove, permanentRemove } = useTasks(activeTab);
-  const { settings, update: updateSettings } = useSettings();
+  const { settings, loading: settingsLoading, update: updateSettings } = useSettings();
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
   const {
     isChecking: isCheckingUpdates,
@@ -143,6 +152,7 @@ export default function App() {
     const all = new Map<number, Task>();
     results.forEach(r => r.forEach(task => all.set(task.id, task)));
     setAllTasks(Array.from(all.values()));
+    setHasLoadedCounts(true);
   }, []);
 
   useEffect(() => {
@@ -150,6 +160,21 @@ export default function App() {
       showToast(`Failed to refresh counts: ${getErrorMessage(error)}`, 'error');
     });
   }, [loadCounts, activeTab, showToast]);
+
+  useEffect(() => {
+    if (vacationNudgeEvaluatedRef.current) return;
+    if (settingsLoading || !hasLoadedCounts) return;
+
+    vacationNudgeEvaluatedRef.current = true;
+
+    const recommendation = getVacationNudgeRecommendation({ tasks: allTasks, settings });
+    if (!recommendation) return;
+
+    setVacationSuggestedDays(recommendation.suggestedDays);
+    setVacationInactivityDays(recommendation.inactivityDays);
+    setVacationAnchorUpdatedAt(recommendation.mostRecentActiveUpdatedAt);
+    setShowVacationNudge(true);
+  }, [allTasks, hasLoadedCounts, settings, settingsLoading]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -318,7 +343,7 @@ export default function App() {
     }, 'Blocker removed.');
   };
 
-  const handleSaveSettings = async (nextSettings: Settings) => {
+  const handleSaveSettings = async (nextSettings: Partial<Settings>) => {
     try {
       await updateSettings(nextSettings);
       await reload();
@@ -336,6 +361,48 @@ export default function App() {
       await runUpdateCheck({ manual: true });
     } catch (error) {
       showToast(`Update check failed: ${getErrorMessage(error)}`, 'error');
+    }
+  };
+
+  const handleApplyVacationNudge = async (days: number) => {
+    if (!vacationAnchorUpdatedAt) return;
+
+    const nextDays = Math.max(1, Math.floor(days));
+    const expires = new Date();
+    expires.setHours(23, 59, 59, 999);
+
+    setVacationNudgeSaving(true);
+    try {
+      await updateSettings({
+        oneTimeOffsetHours: nextDays * 24,
+        oneTimeOffsetExpiresAt: expires.toISOString(),
+        vacationPromptLastShownForUpdatedAt: vacationAnchorUpdatedAt,
+      });
+      setShowVacationNudge(false);
+      showToast(`Applied one-time vacation offset for ${nextDays} day${nextDays === 1 ? '' : 's'} (until end of day).`, 'success');
+    } catch (error) {
+      showToast(`Failed to apply vacation offset: ${getErrorMessage(error)}`, 'error');
+    } finally {
+      setVacationNudgeSaving(false);
+    }
+  };
+
+  const handleSkipVacationNudge = async () => {
+    if (!vacationAnchorUpdatedAt) {
+      setShowVacationNudge(false);
+      return;
+    }
+
+    setVacationNudgeSaving(true);
+    try {
+      await updateSettings({
+        vacationPromptLastShownForUpdatedAt: vacationAnchorUpdatedAt,
+      });
+      setShowVacationNudge(false);
+    } catch (error) {
+      showToast(`Failed to dismiss vacation prompt: ${getErrorMessage(error)}`, 'error');
+    } finally {
+      setVacationNudgeSaving(false);
     }
   };
 
@@ -404,6 +471,15 @@ export default function App() {
         onRemoveBlocker={handleRemoveBlocker}
         onPermanentDelete={handlePermanentDelete}
         onClearSearch={() => setSearchQuery('')}
+      />
+
+      <VacationNudgeModal
+        open={showVacationNudge}
+        suggestedDays={vacationSuggestedDays}
+        inactivityDays={vacationInactivityDays}
+        isSaving={vacationNudgeSaving}
+        onApply={handleApplyVacationNudge}
+        onSkip={handleSkipVacationNudge}
       />
 
       {toasts.length > 0 && (

@@ -29,7 +29,9 @@ export interface Blocker {
 export interface Settings {
   staleThresholdHours: number;
   topN: number;
-  globalTimeOffset: number;
+  oneTimeOffsetHours: number;
+  oneTimeOffsetExpiresAt: string | null;
+  vacationPromptLastShownForUpdatedAt: string | null;
 }
 
 export interface AppData {
@@ -47,7 +49,9 @@ function defaultData(): AppData {
     settings: {
       staleThresholdHours: 48,
       topN: 20,
-      globalTimeOffset: 0,
+      oneTimeOffsetHours: 0,
+      oneTimeOffsetExpiresAt: null,
+      vacationPromptLastShownForUpdatedAt: null,
     },
     nextTaskId: 1,
     nextBlockerId: 1,
@@ -64,7 +68,29 @@ export function readData(): AppData {
     return data;
   }
   const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-  return JSON.parse(raw) as AppData;
+  const parsed = JSON.parse(raw) as AppData;
+  const defaults = defaultData().settings;
+  const incoming = parsed.settings as Partial<Settings> | undefined;
+
+  parsed.settings = {
+    staleThresholdHours: typeof incoming?.staleThresholdHours === 'number'
+      ? incoming.staleThresholdHours
+      : defaults.staleThresholdHours,
+    topN: typeof incoming?.topN === 'number'
+      ? incoming.topN
+      : defaults.topN,
+    oneTimeOffsetHours: typeof incoming?.oneTimeOffsetHours === 'number'
+      ? incoming.oneTimeOffsetHours
+      : defaults.oneTimeOffsetHours,
+    oneTimeOffsetExpiresAt: typeof incoming?.oneTimeOffsetExpiresAt === 'string'
+      ? incoming.oneTimeOffsetExpiresAt
+      : defaults.oneTimeOffsetExpiresAt,
+    vacationPromptLastShownForUpdatedAt: typeof incoming?.vacationPromptLastShownForUpdatedAt === 'string'
+      ? incoming.vacationPromptLastShownForUpdatedAt
+      : defaults.vacationPromptLastShownForUpdatedAt,
+  };
+
+  return parsed;
 }
 
 export function writeData(data: AppData): void {
