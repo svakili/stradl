@@ -83,6 +83,7 @@ export default function App() {
     );
   }, [tasks, searchQuery]);
   const hasActiveSearch = searchQuery.trim().length > 0;
+  const nextTask = activeTab === 'tasks' ? tasks[0] : undefined;
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success', onUndo?: () => void) => {
     const id = Date.now();
@@ -176,56 +177,6 @@ export default function App() {
     setShowVacationNudge(true);
   }, [allTasks, hasLoadedCounts, settings, settingsLoading]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyboard = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      const target = e.target as HTMLElement | null;
-      const isInputLike = target && (
-        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' || target.isContentEditable
-      );
-
-      // Escape closes shortcut help
-      if (e.key === 'Escape' && showShortcutHelp) {
-        setShowShortcutHelp(false);
-        return;
-      }
-
-      if (isInputLike) return;
-
-      // '/' focuses task input (from any tab — switches to tasks first)
-      if (e.key === '/' && !e.shiftKey) {
-        e.preventDefault();
-        if (activeTab !== 'tasks' && activeTab !== 'ideas') {
-          setActiveTab('tasks');
-        }
-        // Need a small delay when switching tabs for the form to render
-        setTimeout(() => newTaskInputRef.current?.focus(), 50);
-        return;
-      }
-
-      // '?' shows shortcut help
-      if (e.key === '?' && e.shiftKey) {
-        e.preventDefault();
-        setShowShortcutHelp(prev => !prev);
-        return;
-      }
-
-      // 1-6 to switch tabs
-      const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= 6 && !e.shiftKey) {
-        e.preventDefault();
-        setActiveTab(TAB_ORDER[num - 1]);
-        return;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyboard);
-    return () => document.removeEventListener('keydown', handleKeyboard);
-  }, [activeTab, showShortcutHelp]);
-
   const runTaskAction = useCallback(async (
     taskId: number,
     action: () => Promise<void>,
@@ -291,6 +242,13 @@ export default function App() {
       void handleUncomplete(id);
     });
   };
+
+  const handleSkip = useCallback(async (id: number) => {
+    await runTaskAction(id, async () => {
+      await update(id, {});
+      await loadCounts();
+    });
+  }, [loadCounts, runTaskAction, update]);
 
   const handleUncomplete = async (id: number) => {
     await runTaskAction(id, async () => {
@@ -393,6 +351,63 @@ export default function App() {
     }
   };
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const target = e.target as HTMLElement | null;
+      const isInputLike = target && (
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' || target.isContentEditable
+      );
+
+      // Escape closes shortcut help
+      if (e.key === 'Escape' && showShortcutHelp) {
+        setShowShortcutHelp(false);
+        return;
+      }
+
+      if (isInputLike) return;
+
+      // '/' focuses task input (from any tab — switches to tasks first)
+      if (e.key === '/' && !e.shiftKey) {
+        e.preventDefault();
+        if (activeTab !== 'tasks' && activeTab !== 'ideas') {
+          setActiveTab('tasks');
+        }
+        // Need a small delay when switching tabs for the form to render
+        setTimeout(() => newTaskInputRef.current?.focus(), 50);
+        return;
+      }
+
+      // 'n' skips the current top task in Tasks
+      if (activeTab === 'tasks' && e.key.toLowerCase() === 'n' && !e.shiftKey && nextTask) {
+        e.preventDefault();
+        void handleSkip(nextTask.id);
+        return;
+      }
+
+      // '?' shows shortcut help
+      if (e.key === '?' && e.shiftKey) {
+        e.preventDefault();
+        setShowShortcutHelp(prev => !prev);
+        return;
+      }
+
+      // 1-6 to switch tabs
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= 6 && !e.shiftKey) {
+        e.preventDefault();
+        setActiveTab(TAB_ORDER[num - 1]);
+        return;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyboard);
+    return () => document.removeEventListener('keydown', handleKeyboard);
+  }, [activeTab, handleSkip, nextTask, showShortcutHelp]);
+
   const showForm = activeTab === 'tasks' || activeTab === 'ideas';
 
   return (
@@ -451,6 +466,7 @@ export default function App() {
         onTabChange={setActiveTab}
         onUpdate={handleUpdate}
         onComplete={handleComplete}
+        onSkip={handleSkip}
         onUncomplete={handleUncomplete}
         onLoadBlockers={handleLoadBlockers}
         onAddBlocker={handleAddBlocker}
@@ -499,6 +515,7 @@ export default function App() {
             <h2>Keyboard Shortcuts</h2>
             <div className="shortcut-list">
               <div className="shortcut-item"><kbd>1</kbd>–<kbd>6</kbd><span>Switch tabs</span></div>
+              <div className="shortcut-item"><kbd>N</kbd><span>Next task</span></div>
               <div className="shortcut-item"><kbd>/</kbd><span>Focus new task input</span></div>
               <div className="shortcut-item"><kbd>?</kbd><span>Toggle this help</span></div>
               <div className="shortcut-item"><kbd>Esc</kbd><span>Close dialogs / cancel edit</span></div>

@@ -17,6 +17,7 @@ interface Props {
   recentlyUpdated?: boolean;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
+  onSkip: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
@@ -32,7 +33,7 @@ const ROW_COLORS: Record<string, string> = {
 
 export default function TaskRow({
   task, settings, showStaleness, isPending, allTasks, blockers, activeTab, recentlyUpdated,
-  onUpdate, onComplete, onUncomplete,
+  onUpdate, onComplete, onSkip, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -214,6 +215,13 @@ export default function TaskRow({
           ) : activeTab === 'ideas' ? (
             <>
               <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+            </>
+          ) : activeTab === 'tasks' ? (
+            <>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-primary" onClick={() => onSkip(task.id)} disabled={isPending} aria-label={`Move to next task after ${task.title}`}>Next</button>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Blockers</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           ) : (

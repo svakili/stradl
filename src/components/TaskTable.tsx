@@ -15,6 +15,7 @@ interface Props {
   onTabChange: (tab: TabName) => void;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
+  onSkip: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
@@ -25,7 +26,7 @@ interface Props {
 
 export default function TaskTable({
   tasks, searchQuery, hasActiveSearch, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
-  onTabChange, onUpdate, onComplete, onUncomplete,
+  onTabChange, onUpdate, onComplete, onSkip, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete, onClearSearch,
 }: Props) {
   const showStaleness = activeTab === 'tasks';
@@ -108,6 +109,7 @@ export default function TaskTable({
           recentlyUpdated={recentlyUpdatedIds?.has(task.id)}
           onUpdate={onUpdate}
           onComplete={onComplete}
+          onSkip={onSkip}
           onUncomplete={onUncomplete}
           onLoadBlockers={onLoadBlockers}
           onAddBlocker={onAddBlocker}
