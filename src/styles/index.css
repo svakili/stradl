@@ -607,6 +607,15 @@ textarea:focus-visible,
   margin-top: 0.25rem;
 }
 
+.settings-update-progress {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+}
+
+.settings-update-message {
+  margin-top: -0.25rem;
+}
+
 /* Dark Mode Toggle */
 .theme-toggle {
   border: none;

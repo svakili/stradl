@@ -4,6 +4,7 @@ import { useTasks } from './hooks/useTasks';
 import { useSettings } from './hooks/useSettings';
 import { useBlockers } from './hooks/useBlockers';
 import { useUpdateCheck, LAST_NOTIFIED_VERSION_KEY } from './hooks/useUpdateCheck';
+import { useApplyUpdate } from './hooks/useApplyUpdate';
 import * as api from './api';
 import TabBar from './components/TabBar';
 import TaskTable from './components/TaskTable';
@@ -24,6 +25,12 @@ const TAB_ORDER: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return 'Something went wrong.';
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 export default function App() {
@@ -51,6 +58,7 @@ export default function App() {
   const pendingTaskIdsRef = useRef<Set<number>>(new Set());
   const highlightTimersRef = useRef<Map<number, number>>(new Map());
   const vacationNudgeEvaluatedRef = useRef(false);
+  const handledUpdateSuccessRef = useRef<string | null>(null);
 
   const { tasks, loading, reload, create, update, complete, uncomplete, remove } = useTasks(activeTab);
   const { settings, loading: settingsLoading, update: updateSettings } = useSettings();
@@ -63,6 +71,12 @@ export default function App() {
     checkNow: runUpdateCheck,
     maybeAutoCheck,
   } = useUpdateCheck();
+  const {
+    status: updateApplyStatus,
+    error: updateApplyError,
+    isApplying: isApplyingUpdate,
+    applyNow: applyUpdateNow,
+  } = useApplyUpdate();
 
   // Apply theme to document
   useEffect(() => {
@@ -309,6 +323,56 @@ export default function App() {
     }
   };
 
+  const handleApplyUpdate = useCallback(async () => {
+    try {
+      await applyUpdateNow();
+      showToast('Applying update. The app will restart automatically when ready.', 'info');
+    } catch (error) {
+      showToast(`Failed to start update: ${getErrorMessage(error)}`, 'error');
+    }
+  }, [applyUpdateNow, showToast]);
+
+  useEffect(() => {
+    if (updateApplyStatus?.state !== 'succeeded') return;
+
+    const successKey = updateApplyStatus.operationId
+      || updateApplyStatus.finishedAt
+      || updateApplyStatus.toVersion
+      || 'succeeded';
+
+    if (handledUpdateSuccessRef.current === successKey) return;
+    handledUpdateSuccessRef.current = successKey;
+
+    let cancelled = false;
+    void (async () => {
+      showToast('Update applied. Reloading latest version...', 'success');
+
+      const deadline = Date.now() + 60_000;
+      while (!cancelled && Date.now() < deadline) {
+        try {
+          const result = await api.checkForUpdates();
+          const reachedTarget = !updateApplyStatus.toVersion || result.currentVersion === updateApplyStatus.toVersion;
+          if (reachedTarget) {
+            window.location.reload();
+            return;
+          }
+        } catch {
+          // Ignore transient failures while the service restarts.
+        }
+
+        await sleep(2000);
+      }
+
+      if (!cancelled) {
+        showToast('Update finished. Refresh the page to load the latest version.', 'info');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showToast, updateApplyStatus]);
+
   const handleApplyVacationNudge = async (days: number) => {
     if (!vacationAnchorUpdatedAt) return;
 
@@ -442,6 +506,10 @@ export default function App() {
             updateLastCheckedAt={updateLastCheckedAt}
             isCheckingUpdates={isCheckingUpdates}
             onCheckForUpdates={handleCheckForUpdates}
+            updateApplyStatus={updateApplyStatus}
+            updateApplyError={updateApplyError}
+            isApplyingUpdate={isApplyingUpdate}
+            onApplyUpdate={handleApplyUpdate}
           />
         </div>
       </header>

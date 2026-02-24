@@ -1,10 +1,23 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', 'data');
-const DATA_FILE = path.join(DATA_DIR, 'tasks.json');
+
+export interface StoragePaths {
+  projectRoot: string;
+  dataDir: string;
+  dataFile: string;
+  legacyDataFiles: string[];
+}
+
+interface ResolveStoragePathsOptions {
+  projectRoot?: string;
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  homeDir?: string;
+}
 
 export interface Task {
   id: number;
@@ -41,6 +54,60 @@ export interface AppData {
   nextBlockerId: number;
 }
 
+export function findProjectRoot(cwd = process.cwd()): string {
+  const candidates = [
+    path.resolve(__dirname, '..', '..'),
+    path.resolve(__dirname, '..'),
+    path.resolve(cwd),
+  ];
+
+  const resolved = candidates.find((candidate) =>
+    fs.existsSync(path.join(candidate, 'package.json'))
+  );
+
+  if (!resolved) {
+    throw new Error('Project root not found.');
+  }
+
+  return resolved;
+}
+
+function resolveDefaultDataDir(homeDir: string, platform: NodeJS.Platform, projectRoot: string): string {
+  if (platform === 'darwin') {
+    return path.join(homeDir, 'Library', 'Application Support', 'Stradl');
+  }
+  return path.join(projectRoot, 'data');
+}
+
+export function resolveStoragePaths(options: ResolveStoragePathsOptions = {}): StoragePaths {
+  const env = options.env ?? process.env;
+  const projectRoot = options.projectRoot ?? findProjectRoot();
+  const platform = options.platform ?? process.platform;
+  const homeDir = options.homeDir ?? env.HOME ?? os.homedir();
+  const configuredDataDir = env.STRADL_DATA_DIR?.trim();
+  const dataDir = configuredDataDir
+    ? path.resolve(configuredDataDir)
+    : resolveDefaultDataDir(homeDir, platform, projectRoot);
+
+  return {
+    projectRoot,
+    dataDir,
+    dataFile: path.join(dataDir, 'tasks.json'),
+    legacyDataFiles: [
+      path.join(projectRoot, 'data', 'tasks.json'),
+      path.join(projectRoot, 'server', 'data', 'tasks.json'),
+    ],
+  };
+}
+
+export function getDataDirectory(): string {
+  return resolveStoragePaths().dataDir;
+}
+
+export function getDataFilePath(): string {
+  return resolveStoragePaths().dataFile;
+}
+
 function defaultData(): AppData {
   return {
     tasks: [],
@@ -57,20 +124,37 @@ function defaultData(): AppData {
   };
 }
 
-export function readData(): AppData {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DATA_FILE)) {
-    const data = defaultData();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-    return data;
-  }
-  const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-  const parsed = JSON.parse(raw) as AppData;
+function pickLatestLegacyDataFile(legacyDataFiles: string[]): string | null {
+  const candidates = legacyDataFiles
+    .filter((file) => fs.existsSync(file))
+    .map((file) => ({ file, mtimeMs: fs.statSync(file).mtimeMs }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
 
-  // Migration: merge isDeleted into isArchived
+  return candidates[0]?.file ?? null;
+}
+
+function ensureDataFile(paths: StoragePaths): void {
+  if (!fs.existsSync(paths.dataDir)) {
+    fs.mkdirSync(paths.dataDir, { recursive: true });
+  }
+
+  if (fs.existsSync(paths.dataFile)) {
+    return;
+  }
+
+  const sourceFile = pickLatestLegacyDataFile(paths.legacyDataFiles);
+  if (sourceFile && path.resolve(sourceFile) !== path.resolve(paths.dataFile)) {
+    fs.copyFileSync(sourceFile, paths.dataFile);
+    return;
+  }
+
+  const data = defaultData();
+  fs.writeFileSync(paths.dataFile, JSON.stringify(data, null, 2));
+}
+
+function normalizeData(parsed: AppData, dataFile: string): AppData {
   let migrated = false;
+
   for (const task of parsed.tasks) {
     if ('isDeleted' in task) {
       if ((task as Record<string, unknown>).isDeleted) {
@@ -80,9 +164,11 @@ export function readData(): AppData {
       migrated = true;
     }
   }
+
   if (migrated) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(parsed, null, 2));
+    fs.writeFileSync(dataFile, JSON.stringify(parsed, null, 2));
   }
+
   const defaults = defaultData().settings;
   const incoming = parsed.settings as Partial<Settings> | undefined;
 
@@ -107,9 +193,25 @@ export function readData(): AppData {
   return parsed;
 }
 
-export function writeData(data: AppData): void {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+export function readDataFromPaths(paths: StoragePaths): AppData {
+  ensureDataFile(paths);
+
+  const raw = fs.readFileSync(paths.dataFile, 'utf-8');
+  const parsed = JSON.parse(raw) as AppData;
+  return normalizeData(parsed, paths.dataFile);
+}
+
+export function readData(): AppData {
+  return readDataFromPaths(resolveStoragePaths());
+}
+
+export function writeDataToPaths(data: AppData, paths: StoragePaths): void {
+  if (!fs.existsSync(paths.dataDir)) {
+    fs.mkdirSync(paths.dataDir, { recursive: true });
   }
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(paths.dataFile, JSON.stringify(data, null, 2));
+}
+
+export function writeData(data: AppData): void {
+  writeDataToPaths(data, resolveStoragePaths());
 }

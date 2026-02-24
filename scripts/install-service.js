@@ -1,12 +1,20 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(__dirname, '..');
-const plistPath = path.join(process.env.HOME, 'Library/LaunchAgents/com.stradl.server.plist');
+const homeDir = process.env.HOME || os.homedir();
+const plistPath = path.join(homeDir, 'Library/LaunchAgents/com.stradl.server.plist');
+const configuredDataDir = process.env.STRADL_DATA_DIR?.trim();
+const dataDir = configuredDataDir
+  ? path.resolve(configuredDataDir)
+  : path.join(homeDir, 'Library', 'Application Support', 'Stradl');
 const nodePath = execSync('which node').toString().trim();
+
+fs.mkdirSync(dataDir, { recursive: true });
 
 const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,9 +34,9 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>${projectDir}/data/server.log</string>
+  <string>${dataDir}/server.log</string>
   <key>StandardErrorPath</key>
-  <string>${projectDir}/data/server-error.log</string>
+  <string>${dataDir}/server-error.log</string>
 </dict>
 </plist>`;
 

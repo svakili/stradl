@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as childProcess from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { updateRoutes } from '../routes/update.js';
+
+vi.mock('child_process', () => ({
+  execSync: vi.fn(() => ''),
+  spawn: vi.fn(() => ({ unref: vi.fn() })),
+}));
 
 function findHandler(method: string, routePath: string) {
   const layer = (updateRoutes as any).stack.find((s: any) =>
@@ -13,6 +19,14 @@ function findHandler(method: string, routePath: string) {
 
 function mockReq(overrides: Record<string, unknown> = {}) {
   return { params: {}, query: {}, body: {}, ...overrides };
+}
+
+function mockLocalReq(overrides: Record<string, unknown> = {}) {
+  return mockReq({
+    ip: '127.0.0.1',
+    socket: { remoteAddress: '127.0.0.1' },
+    ...overrides,
+  });
 }
 
 function mockRes() {
@@ -136,5 +150,126 @@ describe('GET /update-check', () => {
     expect(payload.publishedAt).toBe('2026-02-10T12:00:00.000Z');
     expect(typeof payload.checkedAt).toBe('string');
     expect(Number.isNaN(Date.parse(payload.checkedAt))).toBe(false);
+  });
+});
+
+describe('POST /update-apply', () => {
+  const handler = findHandler('post', '/update-apply');
+  const statusHandler = findHandler('get', '/update-apply-status');
+  const originalEnv = { ...process.env };
+  let tempRoot = '';
+  let launchAgentPath = '';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tempRoot = fs.mkdtempSync(path.join(process.cwd(), 'tmp-update-routes-'));
+    launchAgentPath = path.join(tempRoot, 'Library', 'LaunchAgents', 'com.stradl.server.plist');
+    fs.mkdirSync(path.dirname(launchAgentPath), { recursive: true });
+    fs.writeFileSync(launchAgentPath, '');
+
+    process.env = {
+      ...originalEnv,
+      HOME: tempRoot,
+      STRADL_DATA_DIR: path.join(tempRoot, 'data'),
+      STRADL_ENABLE_SELF_UPDATE: 'true',
+    };
+
+    vi.mocked(childProcess.execSync).mockImplementation(((command: string) => {
+      if (command === 'git status --porcelain') return '';
+      return '';
+    }) as typeof childProcess.execSync);
+    vi.mocked(childProcess.spawn).mockReturnValue({
+      unref: vi.fn(),
+    } as unknown as ReturnType<typeof childProcess.spawn>);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    process.env = { ...originalEnv };
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('returns 403 when self-update is disabled', () => {
+    delete process.env.STRADL_ENABLE_SELF_UPDATE;
+    const res = mockRes();
+
+    handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.send).toHaveBeenCalledWith('Self-update is disabled. Set STRADL_ENABLE_SELF_UPDATE=true to enable.');
+  });
+
+  it('returns 409 when working tree is dirty', () => {
+    vi.mocked(childProcess.execSync).mockImplementation(((command: string) => {
+      if (command === 'git status --porcelain') return ' M src/App.tsx';
+      return '';
+    }) as typeof childProcess.execSync);
+
+    const res = mockRes();
+    handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.send).toHaveBeenCalledWith(
+      'Update blocked: working tree has local changes. Commit or stash changes before updating.'
+    );
+  });
+
+  it('returns 400 when LaunchAgent is missing', () => {
+    fs.unlinkSync(launchAgentPath);
+    const res = mockRes();
+
+    handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.send.mock.calls[0][0]).toContain('LaunchAgent is not installed');
+  });
+
+  it('returns 409 when update is already running', () => {
+    const statusFile = path.join(process.env.STRADL_DATA_DIR!, 'update-status.json');
+    fs.mkdirSync(path.dirname(statusFile), { recursive: true });
+    fs.writeFileSync(statusFile, JSON.stringify({ state: 'running', step: 'building' }, null, 2));
+
+    const res = mockRes();
+    handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.send).toHaveBeenCalledWith('An update is already running.');
+  });
+
+  it('starts update and returns operation metadata', () => {
+    const res = mockRes();
+    handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(202);
+    const payload = res.json.mock.calls[0][0];
+    expect(typeof payload.operationId).toBe('string');
+    expect(typeof payload.startedAt).toBe('string');
+    expect(vi.mocked(childProcess.spawn)).toHaveBeenCalledTimes(1);
+
+    const statusRes = mockRes();
+    statusHandler(mockLocalReq(), statusRes);
+    const statusPayload = statusRes.json.mock.calls[0][0];
+    expect(statusPayload.state).toBe('running');
+    expect(statusPayload.step).toBe('queued');
+  });
+
+  it('reads terminal status from status file', () => {
+    const statusFile = path.join(process.env.STRADL_DATA_DIR!, 'update-status.json');
+    fs.mkdirSync(path.dirname(statusFile), { recursive: true });
+    fs.writeFileSync(statusFile, JSON.stringify({
+      state: 'succeeded',
+      step: 'completed',
+      message: 'ok',
+      fromVersion: '1.0.0',
+      toVersion: '1.1.0',
+    }, null, 2));
+
+    const res = mockRes();
+    statusHandler(mockLocalReq(), res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.state).toBe('succeeded');
+    expect(payload.step).toBe('completed');
+    expect(payload.toVersion).toBe('1.1.0');
   });
 });
