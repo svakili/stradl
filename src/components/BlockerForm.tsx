@@ -14,7 +14,7 @@ export default function BlockerForm({ taskId, allTasks, isDisabled = false, onAd
   const [selectedDate, setSelectedDate] = useState('');
 
   const otherTasks = allTasks.filter(
-    t => t.id !== taskId && t.completedAt == null && !t.isArchived && !t.isDeleted
+    t => t.id !== taskId && t.completedAt == null && !t.isArchived
   );
 
   const handleAdd = async () => {

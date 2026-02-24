@@ -34,7 +34,7 @@ export function hasUnresolvedBlockers(taskId: number, data: AppData): boolean {
 
 export function getPrioritizedTasks(data: AppData): Task[] {
   return data.tasks
-    .filter(t => t.priority != null && !t.isArchived && !t.isDeleted && t.completedAt == null && !hasUnresolvedBlockers(t.id, data))
+    .filter(t => t.priority != null && !t.isArchived && t.completedAt == null && !hasUnresolvedBlockers(t.id, data))
     .sort((a, b) => {
       const pa = PRIORITY_ORDER[a.priority!] ?? 99;
       const pb = PRIORITY_ORDER[b.priority!] ?? 99;

@@ -13,10 +13,9 @@ interface Props {
   loading: boolean;
   recentlyUpdatedIds?: Set<number>;
   onTabChange: (tab: TabName) => void;
-  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
+  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
   onRemoveBlocker: (blockerId: number, taskId: number) => Promise<void>;
@@ -26,7 +25,7 @@ interface Props {
 
 export default function TaskTable({
   tasks, searchQuery, hasActiveSearch, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
-  onTabChange, onUpdate, onComplete, onUncomplete, onDelete,
+  onTabChange, onUpdate, onComplete, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete, onClearSearch,
 }: Props) {
   const showStaleness = activeTab === 'tasks';
@@ -59,10 +58,6 @@ export default function TaskTable({
     archive: {
       title: 'No archived tasks',
       description: 'Archive items you want to keep but hide from active views.',
-    },
-    trash: {
-      title: 'Trash is empty',
-      description: 'Nothing deleted yet.',
     },
   };
 
@@ -114,7 +109,6 @@ export default function TaskTable({
           onUpdate={onUpdate}
           onComplete={onComplete}
           onUncomplete={onUncomplete}
-          onDelete={onDelete}
           onLoadBlockers={onLoadBlockers}
           onAddBlocker={onAddBlocker}
           onRemoveBlocker={onRemoveBlocker}

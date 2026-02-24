@@ -19,7 +19,7 @@ interface ToastState {
   onUndo?: () => void;
 }
 
-const TAB_ORDER: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed', 'archive', 'trash'];
+const TAB_ORDER: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed', 'archive'];
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -28,7 +28,7 @@ function getErrorMessage(error: unknown): string {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabName>('tasks');
-  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0, trash: 0 });
+  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 });
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const [pendingActionByTaskId, setPendingActionByTaskId] = useState<Record<number, boolean>>({});
@@ -52,7 +52,7 @@ export default function App() {
   const highlightTimersRef = useRef<Map<number, number>>(new Map());
   const vacationNudgeEvaluatedRef = useRef(false);
 
-  const { tasks, loading, reload, create, update, complete, uncomplete, remove, permanentRemove } = useTasks(activeTab);
+  const { tasks, loading, reload, create, update, complete, uncomplete, remove } = useTasks(activeTab);
   const { settings, loading: settingsLoading, update: updateSettings } = useSettings();
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
   const {
@@ -144,7 +144,7 @@ export default function App() {
 
   const loadCounts = useCallback(async () => {
     const results = await Promise.all(TAB_ORDER.map(t => api.fetchTasks(t)));
-    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0, trash: 0 };
+    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 };
     TAB_ORDER.forEach((t, i) => { newCounts[t] = results[i].length; });
     setCounts(newCounts);
 
@@ -213,9 +213,9 @@ export default function App() {
         return;
       }
 
-      // 1-7 to switch tabs
+      // 1-6 to switch tabs
       const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= 7 && !e.shiftKey) {
+      if (num >= 1 && num <= 6 && !e.shiftKey) {
         e.preventDefault();
         setActiveTab(TAB_ORDER[num - 1]);
         return;
@@ -266,19 +266,15 @@ export default function App() {
     }
   };
 
-  const handleUpdate = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => {
-    const undoAction = data.isArchived !== undefined || data.isDeleted !== undefined
+  const handleUpdate = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => {
+    const undoAction = data.isArchived !== undefined
       ? () => {
-          const reverseData: Partial<Pick<Task, 'isArchived' | 'isDeleted'>> = {};
-          if (data.isArchived !== undefined) reverseData.isArchived = !data.isArchived;
-          if (data.isDeleted !== undefined) reverseData.isDeleted = !data.isDeleted;
-          void handleUpdate(id, reverseData);
+          void handleUpdate(id, { isArchived: !data.isArchived });
         }
       : undefined;
 
     const message = data.isArchived === true ? 'Task archived.'
       : data.isArchived === false ? 'Task unarchived.'
-      : data.isDeleted === false ? 'Task restored.'
       : undefined;
 
     await runTaskAction(id, async () => {
@@ -303,18 +299,9 @@ export default function App() {
     }, 'Task marked as active.');
   };
 
-  const handleDelete = async (id: number) => {
-    await runTaskAction(id, async () => {
-      await remove(id);
-      await loadCounts();
-    }, 'Task moved to trash.', () => {
-      void handleUpdate(id, { isDeleted: false });
-    });
-  };
-
   const handlePermanentDelete = async (id: number) => {
     await runTaskAction(id, async () => {
-      await permanentRemove(id);
+      await remove(id);
       await loadCounts();
     }, 'Task permanently deleted.');
   };
@@ -465,7 +452,6 @@ export default function App() {
         onUpdate={handleUpdate}
         onComplete={handleComplete}
         onUncomplete={handleUncomplete}
-        onDelete={handleDelete}
         onLoadBlockers={handleLoadBlockers}
         onAddBlocker={handleAddBlocker}
         onRemoveBlocker={handleRemoveBlocker}
@@ -512,7 +498,7 @@ export default function App() {
           <div className="shortcut-dialog" onClick={e => e.stopPropagation()}>
             <h2>Keyboard Shortcuts</h2>
             <div className="shortcut-list">
-              <div className="shortcut-item"><kbd>1</kbd>–<kbd>7</kbd><span>Switch tabs</span></div>
+              <div className="shortcut-item"><kbd>1</kbd>–<kbd>6</kbd><span>Switch tabs</span></div>
               <div className="shortcut-item"><kbd>/</kbd><span>Focus new task input</span></div>
               <div className="shortcut-item"><kbd>?</kbd><span>Toggle this help</span></div>
               <div className="shortcut-item"><kbd>Esc</kbd><span>Close dialogs / cancel edit</span></div>

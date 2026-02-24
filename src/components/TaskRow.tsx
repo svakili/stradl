@@ -15,10 +15,9 @@ interface Props {
   blockers: Blocker[];
   activeTab: TabName;
   recentlyUpdated?: boolean;
-  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) => Promise<void>;
+  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
   onRemoveBlocker: (blockerId: number, taskId: number) => Promise<void>;
@@ -33,7 +32,7 @@ const ROW_COLORS: Record<string, string> = {
 
 export default function TaskRow({
   task, settings, showStaleness, isPending, allTasks, blockers, activeTab, recentlyUpdated,
-  onUpdate, onComplete, onUncomplete, onDelete,
+  onUpdate, onComplete, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -198,37 +197,30 @@ export default function TaskRow({
         </div>
 
         <div className="task-actions">
-          {task.isDeleted ? (
+          {activeTab === 'completed' ? (
             <>
-              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isDeleted: false })} disabled={isPending} aria-label={`Restore ${task.title}`}>Restore</button>
+              <button className="btn btn-sm" onClick={() => onUncomplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as not completed`}>Undo</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+            </>
+          ) : activeTab === 'archive' ? (
+            <>
+              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isArchived: false })} disabled={isPending} aria-label={`Unarchive ${task.title}`}>Unarchive</button>
               <button className="btn btn-sm btn-danger" onClick={() => {
                 if (window.confirm('Permanently delete this task? This cannot be undone.')) {
                   onPermanentDelete(task.id);
                 }
               }} disabled={isPending} aria-label={`Permanently delete ${task.title}`}>Permanently Delete</button>
             </>
-          ) : activeTab === 'completed' ? (
-            <>
-              <button className="btn btn-sm" onClick={() => onUncomplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as not completed`}>Undo</button>
-              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
-            </>
-          ) : activeTab === 'archive' ? (
-            <>
-              <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isArchived: false })} disabled={isPending} aria-label={`Unarchive ${task.title}`}>Unarchive</button>
-              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
-            </>
           ) : activeTab === 'ideas' ? (
             <>
               <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
-              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           ) : (
             <>
               <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
               <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Blockers</button>
-              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: !task.isArchived })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-danger" onClick={() => onDelete(task.id)} disabled={isPending} aria-label={`Delete ${task.title}`}>Delete</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           )}
         </div>
