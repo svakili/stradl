@@ -35,4 +35,23 @@ export interface UpdateCheckResult {
   checkedAt: string;
 }
 
+export type UpdateApplyState = 'idle' | 'running' | 'succeeded' | 'failed';
+
+export interface UpdateApplyStartResult {
+  operationId: string;
+  startedAt: string;
+  targetVersion?: string;
+}
+
+export interface UpdateApplyStatus {
+  state: UpdateApplyState;
+  step: string;
+  message?: string;
+  operationId?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  fromVersion?: string;
+  toVersion?: string;
+}
+
 export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive';

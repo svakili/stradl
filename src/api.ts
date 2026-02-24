@@ -1,4 +1,12 @@
-import type { Task, Blocker, Settings, TabName, UpdateCheckResult } from './types';
+import type {
+  Task,
+  Blocker,
+  Settings,
+  TabName,
+  UpdateCheckResult,
+  UpdateApplyStartResult,
+  UpdateApplyStatus,
+} from './types';
 
 const BASE = '/api';
 
@@ -56,3 +64,9 @@ export const updateSettings = (data: Partial<Settings>) =>
 // Updates
 export const checkForUpdates = () =>
   request<UpdateCheckResult>('/update-check');
+
+export const applyUpdate = () =>
+  request<UpdateApplyStartResult>('/update-apply', { method: 'POST' });
+
+export const fetchUpdateApplyStatus = () =>
+  request<UpdateApplyStatus>('/update-apply-status');

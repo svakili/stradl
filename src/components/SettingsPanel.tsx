@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import type { Settings, UpdateCheckResult } from '../types';
+import type { Settings, UpdateCheckResult, UpdateApplyStatus } from '../types';
 
 interface Props {
   settings: Settings;
@@ -9,6 +9,10 @@ interface Props {
   updateLastCheckedAt: string | null;
   isCheckingUpdates: boolean;
   onCheckForUpdates: () => Promise<void>;
+  updateApplyStatus: UpdateApplyStatus | null;
+  updateApplyError: string | null;
+  isApplyingUpdate: boolean;
+  onApplyUpdate: () => Promise<void>;
 }
 
 interface SettingsDraft {
@@ -36,6 +40,10 @@ export default function SettingsPanel({
   updateLastCheckedAt,
   isCheckingUpdates,
   onCheckForUpdates,
+  updateApplyStatus,
+  updateApplyError,
+  isApplyingUpdate,
+  onApplyUpdate,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -128,6 +136,16 @@ export default function SettingsPanel({
       ? `Update available: v${updateCheckResult.latestVersion}.`
       : `You're up to date (v${updateCheckResult.currentVersion}).`;
 
+  const applyStatus = updateApplyStatus == null
+    ? null
+    : updateApplyStatus.state === 'running'
+      ? `Applying update: ${updateApplyStatus.step}.`
+      : updateApplyStatus.state === 'succeeded'
+        ? `Update applied${updateApplyStatus.toVersion ? ` (v${updateApplyStatus.toVersion})` : ''}.`
+        : updateApplyStatus.state === 'failed'
+          ? 'Update failed.'
+          : null;
+
   return (
     <div className="settings-panel" ref={panelRef}>
       <button className="btn settings-toggle" onClick={() => setOpen(!open)}>
@@ -177,14 +195,28 @@ export default function SettingsPanel({
               </p>
             )}
             {updateCheckError && <p className="settings-error">{updateCheckError}</p>}
+            {applyStatus && <p className="settings-help settings-update-progress">{applyStatus}</p>}
+            {updateApplyStatus?.message && (
+              <p className="settings-help settings-update-message">{updateApplyStatus.message}</p>
+            )}
+            {updateApplyError && <p className="settings-error">{updateApplyError}</p>}
             <div className="settings-update-actions">
               <button
                 className="btn btn-sm"
                 onClick={() => { void onCheckForUpdates(); }}
-                disabled={saving || isCheckingUpdates}
+                disabled={saving || isCheckingUpdates || isApplyingUpdate}
               >
                 {isCheckingUpdates ? 'Checking...' : 'Check for updates'}
               </button>
+              {updateCheckResult?.hasUpdate && (
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => { void onApplyUpdate(); }}
+                  disabled={saving || isApplyingUpdate}
+                >
+                  {isApplyingUpdate ? 'Applying...' : 'Update now'}
+                </button>
+              )}
               {updateCheckResult?.hasUpdate && (
                 <a
                   className="btn btn-sm"

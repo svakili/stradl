@@ -59,6 +59,35 @@ To disable:
 npm run uninstall-service
 ```
 
+## In-App Self-Update (macOS)
+
+The Settings panel can check for updates and apply the latest `origin/main` automatically.
+
+To enable one-click updates, set:
+
+```bash
+export STRADL_ENABLE_SELF_UPDATE=true
+```
+
+Requirements:
+- `git` and `npm` must be available on PATH
+- LaunchAgent must be installed (`npm run install-service`)
+- Working tree must be clean (no uncommitted local changes)
+- Update request must originate from localhost
+
+When enabled, `Update now` runs:
+- `git fetch origin main`
+- `git pull --ff-only origin main`
+- `npm ci --include=dev`
+- `npm run build`
+- `launchctl kickstart -k gui/$UID/com.stradl.server`
+
+If preflight checks fail, the API returns a clear error:
+- self-update disabled (`STRADL_ENABLE_SELF_UPDATE` not `true`)
+- dirty repo (uncommitted changes)
+- missing LaunchAgent plist
+- another update already running
+
 ## Features
 
 - **Priority tabs** -- Tasks (P0/P1/P2), Ideas (no priority), Blocked, Archive
@@ -75,10 +104,21 @@ npm run uninstall-service
 ```
 server/           Express API + JSON file storage
 src/              React frontend (Vite)
-data/             Runtime data (tasks.json, created automatically)
 scripts/          macOS Launch Agent install/uninstall helpers
 ```
 
 ## Data Storage
 
-All data is stored in `data/tasks.json` -- no database required. The file is created automatically on first run.
+By default on macOS, runtime data is stored in:
+
+`~/Library/Application Support/Stradl/tasks.json`
+
+You can override this with:
+
+`STRADL_DATA_DIR=/custom/path`
+
+Migration behavior:
+- On first run with the new storage path, if no destination file exists, Stradl migrates from the newest legacy file:
+  - `<project>/data/tasks.json`
+  - `<project>/server/data/tasks.json`
+- If the destination file already exists, Stradl keeps it and does not overwrite it.
