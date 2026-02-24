@@ -264,13 +264,13 @@ export default function App() {
     }, 'Task permanently deleted.');
   };
 
-  const handleLoadBlockers = async (taskId: number) => {
+  const handleLoadBlockers = useCallback(async (taskId: number) => {
     try {
       await loadForTask(taskId);
     } catch (error) {
       showToast(getErrorMessage(error), 'error');
     }
-  };
+  }, [loadForTask, showToast]);
 
   const handleAddBlocker = async (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => {
     await runTaskAction(taskId, async () => {

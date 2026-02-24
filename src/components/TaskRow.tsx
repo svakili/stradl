@@ -66,6 +66,13 @@ export default function TaskRow({
     }
   }, [editingStatus, autoResizeTextarea]);
 
+  // Auto-load blockers when mounting on the blocked tab
+  useEffect(() => {
+    if (activeTab === 'blocked') {
+      void onLoadBlockers(task.id);
+    }
+  }, [activeTab, task.id, onLoadBlockers]);
+
   const saveTitle = async () => {
     setEditingTitle(false);
     if (titleValue.trim() && titleValue !== task.title) {
