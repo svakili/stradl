@@ -338,6 +338,29 @@ describe('PUT /tasks/:id', () => {
     expect(updated.priority).toBe('P1');
   });
 
+  it('supports no-op update for rotation by touching only updatedAt', () => {
+    const task = makeTask({
+      id: 1,
+      title: 'Original',
+      status: 'Active',
+      priority: 'P1',
+      isArchived: false,
+      updatedAt: '2024-01-01T00:00:00Z',
+    });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: {} }), res);
+
+    const updated = res.json.mock.calls[0][0];
+    expect(updated.title).toBe('Original');
+    expect(updated.status).toBe('Active');
+    expect(updated.priority).toBe('P1');
+    expect(updated.isArchived).toBe(false);
+    expect(updated.updatedAt).not.toBe('2024-01-01T00:00:00Z');
+  });
+
   it('sets priority to null when falsy value provided', () => {
     const task = makeTask({ id: 1, priority: 'P0' });
     const data = makeAppData({ tasks: [task] });
