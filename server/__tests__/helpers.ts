@@ -14,7 +14,6 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     updatedAt: now,
     completedAt: null,
     isArchived: false,
-    isDeleted: false,
     ...overrides,
   };
 }

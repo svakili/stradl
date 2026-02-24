@@ -7,7 +7,6 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   isArchived: boolean;
-  isDeleted: boolean;
 }
 
 export interface Blocker {
@@ -36,4 +35,4 @@ export interface UpdateCheckResult {
   checkedAt: string;
 }
 
-export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive' | 'trash';
+export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive';

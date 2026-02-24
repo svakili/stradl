@@ -158,13 +158,6 @@ describe('getPrioritizedTasks', () => {
       expect(getPrioritizedTasks(data)).toHaveLength(0);
     });
 
-    it('excludes deleted tasks', () => {
-      const data = makeAppData({
-        tasks: [makeTask({ id: 1, isDeleted: true })],
-      });
-      expect(getPrioritizedTasks(data)).toHaveLength(0);
-    });
-
     it('excludes completed tasks', () => {
       const data = makeAppData({
         tasks: [makeTask({ id: 1, completedAt: '2024-01-01T00:00:00Z' })],
@@ -306,8 +299,7 @@ describe('getPrioritizedTasks', () => {
       const data = makeAppData({
         tasks: [
           makeTask({ id: 1, isArchived: true }),
-          makeTask({ id: 2, isDeleted: true }),
-          makeTask({ id: 3, completedAt: '2024-01-01T00:00:00Z' }),
+          makeTask({ id: 2, completedAt: '2024-01-01T00:00:00Z' }),
           makeTask({ id: 4, priority: null }),
         ],
       });

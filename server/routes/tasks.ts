@@ -5,7 +5,7 @@ import { autoUnblock, hasUnresolvedBlockers, getPrioritizedTasks, PRIORITY_ORDER
 
 export const taskRoutes = Router();
 
-// GET /api/tasks?tab=tasks|backlog|ideas|blocked|completed|archive|trash
+// GET /api/tasks?tab=tasks|backlog|ideas|blocked|completed|archive
 taskRoutes.get('/tasks', (req, res) => {
   const data = readData();
   const tab = (req.query.tab as string) || 'tasks';
@@ -42,31 +42,25 @@ taskRoutes.get('/tasks', (req, res) => {
 
     case 'ideas':
       filtered = data.tasks
-        .filter(t => t.priority == null && !t.isArchived && !t.isDeleted && t.completedAt == null)
+        .filter(t => t.priority == null && !t.isArchived && t.completedAt == null)
         .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
       break;
 
     case 'blocked':
       filtered = data.tasks
-        .filter(t => !t.isArchived && !t.isDeleted && t.completedAt == null && hasUnresolvedBlockers(t.id, data))
+        .filter(t => !t.isArchived && t.completedAt == null && hasUnresolvedBlockers(t.id, data))
         .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
       break;
 
     case 'completed':
       filtered = data.tasks
-        .filter(t => t.completedAt != null && !t.isArchived && !t.isDeleted)
+        .filter(t => t.completedAt != null && !t.isArchived)
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
       break;
 
     case 'archive':
       filtered = data.tasks
-        .filter(t => t.isArchived && !t.isDeleted)
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      break;
-
-    case 'trash':
-      filtered = data.tasks
-        .filter(t => t.isDeleted)
+        .filter(t => t.isArchived)
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
       break;
 
@@ -97,7 +91,6 @@ taskRoutes.post('/tasks', (req, res) => {
     updatedAt: now,
     completedAt: null,
     isArchived: false,
-    isDeleted: false,
   };
 
   data.tasks.push(task);
@@ -116,12 +109,21 @@ taskRoutes.put('/tasks/:id', (req, res) => {
     return;
   }
 
-  const { title, status, priority, isArchived, isDeleted } = req.body;
+  const { title, status, priority, isArchived } = req.body;
   if (title !== undefined) task.title = title.trim();
   if (status !== undefined) task.status = typeof status === 'string' ? status.trim() : status;
   if (priority !== undefined) task.priority = priority || null;
-  if (isArchived !== undefined) task.isArchived = isArchived;
-  if (isDeleted !== undefined) task.isDeleted = isDeleted;
+  if (isArchived !== undefined) {
+    task.isArchived = isArchived;
+    // Resolve blockers that depend on this task when archiving
+    if (isArchived) {
+      for (const blocker of data.blockers) {
+        if (blocker.blockedByTaskId === id && !blocker.resolved) {
+          blocker.resolved = true;
+        }
+      }
+    }
+  }
   task.updatedAt = new Date().toISOString();
 
   writeData(data);
@@ -172,44 +174,18 @@ taskRoutes.post('/tasks/:id/uncomplete', (req, res) => {
   res.json(task);
 });
 
-// DELETE /api/tasks/:id (soft-delete by default, ?permanent=true for hard delete)
+// DELETE /api/tasks/:id (permanent delete)
 taskRoutes.delete('/tasks/:id', (req, res) => {
   const data = readData();
   const id = parseInt(req.params.id);
-  const permanent = req.query.permanent === 'true';
 
-  if (permanent) {
-    // Hard delete — remove from data entirely
-    const idx = data.tasks.findIndex(t => t.id === id);
-    if (idx === -1) {
-      res.status(404).json({ error: 'Task not found' });
-      return;
-    }
-    data.tasks.splice(idx, 1);
-    data.blockers = data.blockers.filter(b => b.taskId !== id && b.blockedByTaskId !== id);
-    writeData(data);
-    res.status(204).end();
-    return;
-  }
-
-  // Soft delete
-  const task = data.tasks.find(t => t.id === id);
-
-  if (!task) {
+  const idx = data.tasks.findIndex(t => t.id === id);
+  if (idx === -1) {
     res.status(404).json({ error: 'Task not found' });
     return;
   }
-
-  task.isDeleted = true;
-  task.updatedAt = new Date().toISOString();
-
-  // Resolve blockers that depend on this task so blocked tasks get unblocked
-  for (const blocker of data.blockers) {
-    if (blocker.blockedByTaskId === id && !blocker.resolved) {
-      blocker.resolved = true;
-    }
-  }
-
+  data.tasks.splice(idx, 1);
+  data.blockers = data.blockers.filter(b => b.taskId !== id && b.blockedByTaskId !== id);
   writeData(data);
-  res.json(task);
+  res.status(204).end();
 });

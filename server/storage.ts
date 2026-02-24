@@ -15,7 +15,6 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   isArchived: boolean;
-  isDeleted: boolean;
 }
 
 export interface Blocker {
@@ -69,6 +68,21 @@ export function readData(): AppData {
   }
   const raw = fs.readFileSync(DATA_FILE, 'utf-8');
   const parsed = JSON.parse(raw) as AppData;
+
+  // Migration: merge isDeleted into isArchived
+  let migrated = false;
+  for (const task of parsed.tasks) {
+    if ('isDeleted' in task) {
+      if ((task as Record<string, unknown>).isDeleted) {
+        task.isArchived = true;
+      }
+      delete (task as Record<string, unknown>).isDeleted;
+      migrated = true;
+    }
+  }
+  if (migrated) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(parsed, null, 2));
+  }
   const defaults = defaultData().settings;
   const incoming = parsed.settings as Partial<Settings> | undefined;
 

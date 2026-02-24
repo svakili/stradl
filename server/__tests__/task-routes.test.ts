@@ -175,23 +175,6 @@ describe('GET /tasks', () => {
     expect(archived[0].id).toBe(1);
   });
 
-  it('returns trash (deleted tasks)', () => {
-    const data = makeAppData({
-      tasks: [
-        makeTask({ id: 1, isDeleted: true }),
-        makeTask({ id: 2, isDeleted: false }),
-      ],
-    });
-    mockedReadData.mockReturnValue(data);
-    const res = mockRes();
-
-    handler(mockReq({ query: { tab: 'trash' } }), res);
-
-    const trash = res.json.mock.calls[0][0];
-    expect(trash).toHaveLength(1);
-    expect(trash[0].id).toBe(1);
-  });
-
   it('calls writeData when autoUnblock resolves blockers', () => {
     const data = makeAppData({
       tasks: [makeTask({ id: 1 })],
@@ -227,33 +210,17 @@ describe('GET /tasks', () => {
     expect(res.json.mock.calls[0][0]).toEqual([]);
   });
 
-  it('excludes deleted tasks from ideas tab', () => {
+  it('excludes archived tasks from ideas tab', () => {
     const data = makeAppData({
       tasks: [
-        makeTask({ id: 1, priority: null, isDeleted: true }),
-        makeTask({ id: 2, priority: null, isDeleted: false }),
+        makeTask({ id: 1, priority: null, isArchived: true }),
+        makeTask({ id: 2, priority: null, isArchived: false }),
       ],
     });
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
     handler(mockReq({ query: { tab: 'ideas' } }), res);
-
-    expect(res.json.mock.calls[0][0]).toHaveLength(1);
-    expect(res.json.mock.calls[0][0][0].id).toBe(2);
-  });
-
-  it('excludes deleted tasks from archive tab', () => {
-    const data = makeAppData({
-      tasks: [
-        makeTask({ id: 1, isArchived: true, isDeleted: true }),
-        makeTask({ id: 2, isArchived: true, isDeleted: false }),
-      ],
-    });
-    mockedReadData.mockReturnValue(data);
-    const res = mockRes();
-
-    handler(mockReq({ query: { tab: 'archive' } }), res);
 
     expect(res.json.mock.calls[0][0]).toHaveLength(1);
     expect(res.json.mock.calls[0][0][0].id).toBe(2);
@@ -277,7 +244,6 @@ describe('POST /tasks', () => {
     expect(task.priority).toBe(null);
     expect(task.completedAt).toBe(null);
     expect(task.isArchived).toBe(false);
-    expect(task.isDeleted).toBe(false);
   });
 
   it('trims the title', () => {
@@ -404,15 +370,32 @@ describe('PUT /tasks/:id', () => {
     expect(res.json.mock.calls[0][0].isArchived).toBe(true);
   });
 
-  it('updates isDeleted', () => {
-    const task = makeTask({ id: 1, isDeleted: false });
-    const data = makeAppData({ tasks: [task] });
+  it('resolves dependent blockers on archive', () => {
+    const task = makeTask({ id: 1, isArchived: false });
+    const blocker = makeBlocker({ taskId: 2, blockedByTaskId: 1, resolved: false });
+    const unrelatedBlocker = makeBlocker({ taskId: 3, blockedByTaskId: 5, resolved: false });
+    const data = makeAppData({ tasks: [task], blockers: [blocker, unrelatedBlocker] });
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
-    handler(mockReq({ params: { id: '1' }, body: { isDeleted: true } }), res);
+    handler(mockReq({ params: { id: '1' }, body: { isArchived: true } }), res);
 
-    expect(res.json.mock.calls[0][0].isDeleted).toBe(true);
+    expect(res.json.mock.calls[0][0].isArchived).toBe(true);
+    expect(blocker.resolved).toBe(true);
+    expect(unrelatedBlocker.resolved).toBe(false);
+  });
+
+  it('does not resolve blockers when unarchiving', () => {
+    const task = makeTask({ id: 1, isArchived: true });
+    const blocker = makeBlocker({ taskId: 2, blockedByTaskId: 1, resolved: false });
+    const data = makeAppData({ tasks: [task], blockers: [blocker] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { isArchived: false } }), res);
+
+    expect(res.json.mock.calls[0][0].isArchived).toBe(false);
+    expect(blocker.resolved).toBe(false);
   });
 });
 
@@ -496,44 +479,20 @@ describe('POST /tasks/:id/uncomplete', () => {
 describe('DELETE /tasks/:id', () => {
   const handler = findHandler('delete', '/tasks/:id');
 
-  it('soft-deletes by default', () => {
-    const task = makeTask({ id: 1, isDeleted: false });
-    const data = makeAppData({ tasks: [task] });
-    mockedReadData.mockReturnValue(data);
-    const res = mockRes();
-
-    handler(mockReq({ params: { id: '1' }, query: {} }), res);
-
-    expect(res.json.mock.calls[0][0].isDeleted).toBe(true);
-    expect(data.tasks).toHaveLength(1); // still in the array
-  });
-
-  it('resolves dependent blockers on soft-delete', () => {
-    const task = makeTask({ id: 1 });
-    const blocker = makeBlocker({ taskId: 2, blockedByTaskId: 1, resolved: false });
-    const data = makeAppData({ tasks: [task], blockers: [blocker] });
-    mockedReadData.mockReturnValue(data);
-    const res = mockRes();
-
-    handler(mockReq({ params: { id: '1' }, query: {} }), res);
-
-    expect(blocker.resolved).toBe(true);
-  });
-
-  it('hard-deletes with permanent=true', () => {
+  it('permanently deletes the task', () => {
     const task = makeTask({ id: 1 });
     const data = makeAppData({ tasks: [task] });
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
-    handler(mockReq({ params: { id: '1' }, query: { permanent: 'true' } }), res);
+    handler(mockReq({ params: { id: '1' } }), res);
 
     expect(data.tasks).toHaveLength(0);
     expect(res.status).toHaveBeenCalledWith(204);
     expect(res.end).toHaveBeenCalled();
   });
 
-  it('removes associated blockers on hard delete', () => {
+  it('removes associated blockers on delete', () => {
     const task = makeTask({ id: 1 });
     const blockerFor = makeBlocker({ id: 10, taskId: 1 });
     const blockerBy = makeBlocker({ id: 11, taskId: 2, blockedByTaskId: 1 });
@@ -542,28 +501,18 @@ describe('DELETE /tasks/:id', () => {
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
-    handler(mockReq({ params: { id: '1' }, query: { permanent: 'true' } }), res);
+    handler(mockReq({ params: { id: '1' } }), res);
 
     expect(data.blockers).toHaveLength(1);
     expect(data.blockers[0].id).toBe(12);
   });
 
-  it('returns 404 for nonexistent task on soft delete', () => {
+  it('returns 404 for nonexistent task', () => {
     const data = makeAppData();
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
-    handler(mockReq({ params: { id: '999' }, query: {} }), res);
-
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  it('returns 404 for nonexistent task on hard delete', () => {
-    const data = makeAppData();
-    mockedReadData.mockReturnValue(data);
-    const res = mockRes();
-
-    handler(mockReq({ params: { id: '999' }, query: { permanent: 'true' } }), res);
+    handler(mockReq({ params: { id: '999' } }), res);
 
     expect(res.status).toHaveBeenCalledWith(404);
   });

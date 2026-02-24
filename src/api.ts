@@ -24,7 +24,7 @@ export const fetchTasks = (tab: TabName) =>
 export const createTask = (data: { title: string; status?: string; priority?: string | null }) =>
   request<Task>('/tasks', { method: 'POST', body: JSON.stringify(data) });
 
-export const updateTask = (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'isDeleted'>>) =>
+export const updateTask = (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) =>
   request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 export const completeTask = (id: number) =>
@@ -34,10 +34,7 @@ export const uncompleteTask = (id: number) =>
   request<Task>(`/tasks/${id}/uncomplete`, { method: 'POST' });
 
 export const deleteTask = (id: number) =>
-  request<Task>(`/tasks/${id}`, { method: 'DELETE' });
-
-export const permanentDeleteTask = (id: number) =>
-  request<void>(`/tasks/${id}?permanent=true`, { method: 'DELETE' });
+  request<void>(`/tasks/${id}`, { method: 'DELETE' });
 
 // Blockers
 export const fetchBlockers = (taskId: number) =>

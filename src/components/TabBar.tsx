@@ -13,7 +13,6 @@ const TABS: { key: TabName; label: string }[] = [
   { key: 'blocked', label: 'Blocked' },
   { key: 'completed', label: 'Completed' },
   { key: 'archive', label: 'Archive' },
-  { key: 'trash', label: 'Trash' },
 ];
 
 export default function TabBar({ activeTab, onTabChange, counts }: Props) {

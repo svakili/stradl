@@ -18,7 +18,7 @@ export function getVacationNudgeRecommendation({
   settings,
   nowMs = Date.now(),
 }: VacationNudgeInput): VacationNudgeRecommendation | null {
-  const activeTasks = tasks.filter(t => t.completedAt == null && !t.isArchived && !t.isDeleted);
+  const activeTasks = tasks.filter(t => t.completedAt == null && !t.isArchived);
   if (activeTasks.length === 0) return null;
 
   let mostRecentUpdatedAt: string | null = null;
