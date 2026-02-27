@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { Task, Settings, Blocker, TabName } from '../types';
 import TaskRow from './TaskRow';
 
@@ -12,10 +13,13 @@ interface Props {
   activeTab: TabName;
   loading: boolean;
   recentlyUpdatedIds?: Set<number>;
+  focusedTaskId: number | null;
   onTabChange: (tab: TabName) => void;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
-  onSkip: (id: number) => Promise<void>;
+  onHide: (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => Promise<void>;
+  onUnhide: (id: number) => Promise<void>;
+  onFocusToggle: (id: number, options?: { unhideFirst?: boolean }) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
@@ -26,10 +30,20 @@ interface Props {
 
 export default function TaskTable({
   tasks, searchQuery, hasActiveSearch, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
-  onTabChange, onUpdate, onComplete, onSkip, onUncomplete,
+  focusedTaskId, onTabChange, onUpdate, onComplete, onHide, onUnhide, onFocusToggle, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete, onClearSearch,
 }: Props) {
   const showStaleness = activeTab === 'tasks';
+  const orderedTasks = useMemo(() => {
+    if (focusedTaskId == null) return tasks;
+    const focusedIndex = tasks.findIndex(task => task.id === focusedTaskId);
+    if (focusedIndex <= 0) return tasks;
+
+    const reordered = [...tasks];
+    const [focusedTask] = reordered.splice(focusedIndex, 1);
+    reordered.unshift(focusedTask);
+    return reordered;
+  }, [tasks, focusedTaskId]);
 
   const EMPTY_STATES: Record<TabName, { title: string; description: string; ctaLabel?: string; ctaTab?: TabName }> = {
     tasks: {
@@ -50,6 +64,12 @@ export default function TaskTable({
       title: 'No blocked tasks',
       description: 'Everything is currently unblocked.',
       ctaLabel: 'Review blockers',
+      ctaTab: 'tasks',
+    },
+    hidden: {
+      title: 'No hidden tasks',
+      description: 'Use Hide on the Tasks tab to temporarily defer short context switches.',
+      ctaLabel: 'Go to Tasks',
       ctaTab: 'tasks',
     },
     completed: {
@@ -96,7 +116,7 @@ export default function TaskTable({
 
   return (
     <div className="task-table" id={`tab-panel-${activeTab}`} role="tabpanel">
-      {tasks.map(task => (
+      {orderedTasks.map(task => (
         <TaskRow
           key={task.id}
           task={task}
@@ -107,9 +127,12 @@ export default function TaskTable({
           blockers={blockers[task.id] || []}
           activeTab={activeTab}
           recentlyUpdated={recentlyUpdatedIds?.has(task.id)}
+          isFocused={focusedTaskId === task.id}
           onUpdate={onUpdate}
           onComplete={onComplete}
-          onSkip={onSkip}
+          onHide={onHide}
+          onUnhide={onUnhide}
+          onFocusToggle={onFocusToggle}
           onUncomplete={onUncomplete}
           onLoadBlockers={onLoadBlockers}
           onAddBlocker={onAddBlocker}

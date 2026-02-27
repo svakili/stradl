@@ -7,6 +7,7 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   isArchived: boolean;
+  hiddenUntilAt: string | null;
 }
 
 export interface Blocker {
@@ -23,6 +24,7 @@ export interface Settings {
   oneTimeOffsetHours: number;
   oneTimeOffsetExpiresAt: string | null;
   vacationPromptLastShownForUpdatedAt: string | null;
+  focusedTaskId: number | null;
 }
 
 export interface UpdateCheckResult {
@@ -54,4 +56,4 @@ export interface UpdateApplyStatus {
   toVersion?: string;
 }
 
-export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'completed' | 'archive';
+export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'hidden' | 'completed' | 'archive';

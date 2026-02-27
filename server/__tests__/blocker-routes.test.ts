@@ -142,6 +142,26 @@ describe('POST /tasks/:id/blockers', () => {
 
     expect(mockedWriteData).toHaveBeenCalledWith(data);
   });
+
+  it('clears focusedTaskId when focused task becomes blocked', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1 })],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { blockedUntilDate: '2099-01-01T00:00:00Z' } }), res);
+
+    expect(data.settings.focusedTaskId).toBeNull();
+  });
 });
 
 describe('DELETE /blockers/:id', () => {

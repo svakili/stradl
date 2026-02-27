@@ -9,6 +9,7 @@ export function useSettings() {
     oneTimeOffsetHours: 0,
     oneTimeOffsetExpiresAt: null,
     vacationPromptLastShownForUpdatedAt: null,
+    focusedTaskId: null,
   });
   const [loading, setLoading] = useState(true);
 
