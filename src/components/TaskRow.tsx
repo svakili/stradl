@@ -200,7 +200,10 @@ export default function TaskRow({
               disabled={isPending}
             />
           ) : (
-            <span>{task.title}</span>
+            <span className="task-title-display">
+              <span className="task-id-badge">#{task.id}</span>
+              <span className="task-title-text">{task.title}</span>
+            </span>
           )}
         </div>
 

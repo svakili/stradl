@@ -35,7 +35,9 @@ export default function BlockerList({ blockers, allTasks, onRemove, isDisabled =
           <div key={b.id} className="blocker-item">
             <span>
               {blockingTask
-                ? `Blocked by: ${blockingTask.title}`
+                ? `Blocked by: #${blockingTask.id} · ${blockingTask.title}`
+                : b.blockedByTaskId
+                  ? `Blocked by: #${b.blockedByTaskId} (task not found)`
                 : b.blockedUntilDate
                   ? formatBlockedUntil(b.blockedUntilDate)
                   : 'Unknown blocker'}
