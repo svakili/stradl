@@ -32,9 +32,27 @@ export function hasUnresolvedBlockers(taskId: number, data: AppData): boolean {
   return data.blockers.some(b => b.taskId === taskId && !b.resolved);
 }
 
+export function isTaskBlocked(taskId: number, data: AppData): boolean {
+  return hasUnresolvedBlockers(taskId, data);
+}
+
+export function isTaskHiddenNow(task: Task, now = new Date()): boolean {
+  if (!task.hiddenUntilAt) return false;
+  const hiddenUntil = new Date(task.hiddenUntilAt);
+  if (Number.isNaN(hiddenUntil.getTime())) return false;
+  return hiddenUntil > now;
+}
+
 export function getPrioritizedTasks(data: AppData): Task[] {
+  const now = new Date();
   return data.tasks
-    .filter(t => t.priority != null && !t.isArchived && t.completedAt == null && !hasUnresolvedBlockers(t.id, data))
+    .filter(t => (
+      t.priority != null
+      && !t.isArchived
+      && t.completedAt == null
+      && !isTaskBlocked(t.id, data)
+      && !isTaskHiddenNow(t, now)
+    ))
     .sort((a, b) => {
       const pa = PRIORITY_ORDER[a.priority!] ?? 99;
       const pb = PRIORITY_ORDER[b.priority!] ?? 99;

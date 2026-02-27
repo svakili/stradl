@@ -11,13 +11,16 @@ interface Props {
   settings: Settings;
   showStaleness: boolean;
   isPending: boolean;
+  isFocused: boolean;
   allTasks: Task[];
   blockers: Blocker[];
   activeTab: TabName;
   recentlyUpdated?: boolean;
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
-  onSkip: (id: number) => Promise<void>;
+  onHide: (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => Promise<void>;
+  onUnhide: (id: number) => Promise<void>;
+  onFocusToggle: (id: number, options?: { unhideFirst?: boolean }) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
   onLoadBlockers: (taskId: number) => Promise<void>;
   onAddBlocker: (taskId: number, data: { blockedByTaskId?: number; blockedUntilDate?: string }) => Promise<void>;
@@ -30,10 +33,34 @@ const ROW_COLORS: Record<string, string> = {
   P1: 'var(--row-p1)',
   P2: 'var(--row-p2)',
 };
+const HIDE_PRESETS: Array<{ minutes: 15 | 30 | 60 | 120 | 240; label: string }> = [
+  { minutes: 15, label: '15m' },
+  { minutes: 30, label: '30m' },
+  { minutes: 60, label: '1h' },
+  { minutes: 120, label: '2h' },
+  { minutes: 240, label: '4h' },
+];
+
+function formatHiddenTimestamp(hiddenUntilAt: string | null): string {
+  if (!hiddenUntilAt) return 'Hidden temporarily';
+  const until = new Date(hiddenUntilAt);
+  if (Number.isNaN(until.getTime())) return 'Hidden temporarily';
+
+  const now = Date.now();
+  const remainingMs = until.getTime() - now;
+  const hiddenUntilLabel = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+  if (remainingMs <= 0) return `Hidden until ${hiddenUntilLabel} (returning now)`;
+  const remainingMinutes = Math.ceil(remainingMs / 60000);
+  if (remainingMinutes < 60) return `Hidden until ${hiddenUntilLabel} (in ${remainingMinutes}m)`;
+
+  const remainingHours = Math.ceil(remainingMinutes / 60);
+  return `Hidden until ${hiddenUntilLabel} (in ${remainingHours}h)`;
+}
 
 export default function TaskRow({
-  task, settings, showStaleness, isPending, allTasks, blockers, activeTab, recentlyUpdated,
-  onUpdate, onComplete, onSkip, onUncomplete,
+  task, settings, showStaleness, isPending, isFocused, allTasks, blockers, activeTab, recentlyUpdated,
+  onUpdate, onComplete, onHide, onUnhide, onFocusToggle, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -41,8 +68,10 @@ export default function TaskRow({
   const [titleValue, setTitleValue] = useState(task.title);
   const [statusValue, setStatusValue] = useState(task.status);
   const [showBlockers, setShowBlockers] = useState(activeTab === 'blocked');
+  const [showHideMenu, setShowHideMenu] = useState(false);
   const skipNextTitleBlurSaveRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hideMenuRef = useRef<HTMLDivElement>(null);
 
   const stale = showStaleness && isStale(task.updatedAt, settings);
   const bgColor = stale ? 'var(--row-stale)' : (task.priority ? ROW_COLORS[task.priority] : 'var(--row-idea)');
@@ -54,9 +83,23 @@ export default function TaskRow({
     }
   }, [task.status, editingStatus]);
 
+  useEffect(() => {
+    if (!showHideMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!hideMenuRef.current) return;
+      if (!hideMenuRef.current.contains(event.target as Node)) {
+        setShowHideMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showHideMenu]);
+
   const autoResizeTextarea = useCallback((el: HTMLTextAreaElement) => {
     el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
+    el.style.height = `${el.scrollHeight}px`;
   }, []);
 
   // Auto-resize when editing starts
@@ -136,11 +179,14 @@ export default function TaskRow({
 
   const timestamp = activeTab === 'completed' && task.completedAt
     ? `Completed ${relativeTime(task.completedAt)}`
-    : `Updated ${relativeTime(task.updatedAt)}`;
+    : activeTab === 'hidden'
+      ? formatHiddenTimestamp(task.hiddenUntilAt)
+      : `Updated ${relativeTime(task.updatedAt)}`;
 
   const rowClasses = [
     'task-row',
     isPending ? 'task-row-pending' : '',
+    isFocused ? 'task-row-focused' : '',
     recentlyUpdated ? 'task-row-highlight' : '',
   ].filter(Boolean).join(' ');
 
@@ -202,6 +248,7 @@ export default function TaskRow({
           ) : (
             <span className="task-title-display">
               <span className="task-id-badge">#{task.id}</span>
+              {isFocused && <span className="task-now-pill">Now</span>}
               <span className="task-title-text">{task.title}</span>
             </span>
           )}
@@ -216,28 +263,80 @@ export default function TaskRow({
           ) : activeTab === 'archive' ? (
             <>
               <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id, { isArchived: false })} disabled={isPending} aria-label={`Unarchive ${task.title}`}>Unarchive</button>
-              <button className="btn btn-sm btn-danger" onClick={() => {
-                if (window.confirm('Permanently delete this task? This cannot be undone.')) {
-                  onPermanentDelete(task.id);
-                }
-              }} disabled={isPending} aria-label={`Permanently delete ${task.title}`}>Permanently Delete</button>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={() => {
+                  if (window.confirm('Permanently delete this task? This cannot be undone.')) {
+                    void onPermanentDelete(task.id);
+                  }
+                }}
+                disabled={isPending}
+                aria-label={`Permanently delete ${task.title}`}
+              >
+                Permanently Delete
+              </button>
+            </>
+          ) : activeTab === 'hidden' ? (
+            <>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm" onClick={() => onUnhide(task.id)} disabled={isPending} aria-label={`Unhide ${task.title}`}>Unhide</button>
+              <button className="btn btn-sm btn-primary" onClick={() => onFocusToggle(task.id, { unhideFirst: true })} disabled={isPending} aria-label={`Focus ${task.title} now`}>Now</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           ) : activeTab === 'ideas' ? (
             <>
               <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           ) : activeTab === 'tasks' ? (
             <>
               <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
-              <button className="btn btn-sm btn-primary" onClick={() => onSkip(task.id)} disabled={isPending} aria-label={`Move to next task after ${task.title}`}>Next</button>
-              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Blockers</button>
+              <div className="hide-menu" ref={hideMenuRef}>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setShowHideMenu(prev => !prev)}
+                  disabled={isPending}
+                  aria-haspopup="menu"
+                  aria-expanded={showHideMenu}
+                  aria-label={`Hide ${task.title} for a short duration`}
+                >
+                  Hide
+                </button>
+                {showHideMenu && (
+                  <div className="hide-menu-popover" role="menu" aria-label={`Hide durations for ${task.title}`}>
+                    {HIDE_PRESETS.map(preset => (
+                      <button
+                        key={preset.minutes}
+                        className="btn btn-sm btn-outline"
+                        onClick={() => {
+                          setShowHideMenu(false);
+                          void onHide(task.id, preset.minutes);
+                        }}
+                        disabled={isPending}
+                        role="menuitem"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
+              <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
+              <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+            </>
+          ) : activeTab === 'blocked' ? (
+            <>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           ) : (
             <>
               <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
-              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Blockers</button>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
+              <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
             </>
           )}

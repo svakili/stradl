@@ -28,6 +28,7 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
   isArchived: boolean;
+  hiddenUntilAt: string | null;
 }
 
 export interface Blocker {
@@ -44,6 +45,7 @@ export interface Settings {
   oneTimeOffsetHours: number;
   oneTimeOffsetExpiresAt: string | null;
   vacationPromptLastShownForUpdatedAt: string | null;
+  focusedTaskId: number | null;
 }
 
 export interface AppData {
@@ -118,6 +120,7 @@ function defaultData(): AppData {
       oneTimeOffsetHours: 0,
       oneTimeOffsetExpiresAt: null,
       vacationPromptLastShownForUpdatedAt: null,
+      focusedTaskId: null,
     },
     nextTaskId: 1,
     nextBlockerId: 1,
@@ -163,6 +166,12 @@ function normalizeData(parsed: AppData, dataFile: string): AppData {
       delete (task as Record<string, unknown>).isDeleted;
       migrated = true;
     }
+
+    const hiddenUntilAt = (task as unknown as Record<string, unknown>).hiddenUntilAt;
+    if (hiddenUntilAt === undefined || (hiddenUntilAt !== null && typeof hiddenUntilAt !== 'string')) {
+      task.hiddenUntilAt = null;
+      migrated = true;
+    }
   }
 
   if (migrated) {
@@ -188,6 +197,9 @@ function normalizeData(parsed: AppData, dataFile: string): AppData {
     vacationPromptLastShownForUpdatedAt: typeof incoming?.vacationPromptLastShownForUpdatedAt === 'string'
       ? incoming.vacationPromptLastShownForUpdatedAt
       : defaults.vacationPromptLastShownForUpdatedAt,
+    focusedTaskId: typeof incoming?.focusedTaskId === 'number'
+      ? incoming.focusedTaskId
+      : defaults.focusedTaskId,
   };
 
   return parsed;

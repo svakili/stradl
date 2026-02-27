@@ -18,9 +18,17 @@ interface ToastState {
   type: 'success' | 'error' | 'info';
   message: string;
   onUndo?: () => void;
+  onPermanentDelete?: () => void;
 }
 
-const TAB_ORDER: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'completed', 'archive'];
+const TAB_ORDER: TabName[] = ['tasks', 'backlog', 'ideas', 'blocked', 'hidden', 'completed', 'archive'];
+const HIDE_DURATION_LABELS: Record<15 | 30 | 60 | 120 | 240, string> = {
+  15: '15m',
+  30: '30m',
+  60: '1h',
+  120: '2h',
+  240: '4h',
+};
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -35,7 +43,7 @@ function sleep(ms: number): Promise<void> {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabName>('tasks');
-  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 });
+  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, hidden: 0, completed: 0, archive: 0 });
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const [pendingActionByTaskId, setPendingActionByTaskId] = useState<Record<number, boolean>>({});
@@ -60,8 +68,8 @@ export default function App() {
   const vacationNudgeEvaluatedRef = useRef(false);
   const handledUpdateSuccessRef = useRef<string | null>(null);
 
-  const { tasks, loading, reload, create, update, complete, uncomplete, remove } = useTasks(activeTab);
-  const { settings, loading: settingsLoading, update: updateSettings } = useSettings();
+  const { tasks, loading, reload, create, update, complete, uncomplete, hide, unhide, focus, clearFocus, remove } = useTasks(activeTab);
+  const { settings, loading: settingsLoading, reload: reloadSettings, update: updateSettings } = useSettings();
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
   const {
     isChecking: isCheckingUpdates,
@@ -97,12 +105,16 @@ export default function App() {
     );
   }, [tasks, searchQuery]);
   const hasActiveSearch = searchQuery.trim().length > 0;
-  const nextTask = activeTab === 'tasks' ? tasks[0] : undefined;
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success', onUndo?: () => void) => {
+  const showToast = useCallback((
+    message: string,
+    type: 'success' | 'error' | 'info' = 'success',
+    onUndo?: () => void,
+    onPermanentDelete?: () => void
+  ) => {
     const id = Date.now();
     setToasts(prev => {
-      const next = [...prev, { id, type, message, onUndo }];
+      const next = [...prev, { id, type, message, onUndo, onPermanentDelete }];
       return next.length > 3 ? next.slice(-3) : next;
     });
   }, []);
@@ -159,7 +171,7 @@ export default function App() {
 
   const loadCounts = useCallback(async () => {
     const results = await Promise.all(TAB_ORDER.map(t => api.fetchTasks(t)));
-    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, completed: 0, archive: 0 };
+    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, hidden: 0, completed: 0, archive: 0 };
     TAB_ORDER.forEach((t, i) => { newCounts[t] = results[i].length; });
     setCounts(newCounts);
 
@@ -196,6 +208,7 @@ export default function App() {
     action: () => Promise<void>,
     successMessage?: string,
     onUndo?: () => void,
+    onPermanentDelete?: () => void,
   ) => {
     if (pendingTaskIdsRef.current.has(taskId)) return;
 
@@ -204,9 +217,10 @@ export default function App() {
 
     try {
       await action();
+      await reloadSettings();
       markRecentlyUpdated(taskId);
       if (successMessage) {
-        showToast(successMessage, 'success', onUndo);
+        showToast(successMessage, 'success', onUndo, onPermanentDelete);
       }
     } catch (error) {
       showToast(getErrorMessage(error), 'error');
@@ -218,7 +232,7 @@ export default function App() {
         return next;
       });
     }
-  }, [showToast, markRecentlyUpdated]);
+  }, [showToast, markRecentlyUpdated, reloadSettings]);
 
   const handleCreate = async (data: { title: string; status?: string; priority?: string | null }) => {
     try {
@@ -237,6 +251,13 @@ export default function App() {
           void handleUpdate(id, { isArchived: !data.isArchived });
         }
       : undefined;
+    const permanentDeleteAction = data.isArchived === true
+      ? () => {
+          if (window.confirm('Permanently delete this task? This cannot be undone.')) {
+            void handlePermanentDelete(id);
+          }
+        }
+      : undefined;
 
     const message = data.isArchived === true ? 'Task archived.'
       : data.isArchived === false ? 'Task unarchived.'
@@ -245,7 +266,7 @@ export default function App() {
     await runTaskAction(id, async () => {
       await update(id, data);
       await loadCounts();
-    }, message, undoAction);
+    }, message, undoAction, permanentDeleteAction);
   };
 
   const handleComplete = async (id: number) => {
@@ -257,12 +278,40 @@ export default function App() {
     });
   };
 
-  const handleSkip = useCallback(async (id: number) => {
+  const handleHide = async (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => {
+    const durationLabel = HIDE_DURATION_LABELS[durationMinutes];
     await runTaskAction(id, async () => {
-      await update(id, {});
+      await hide(id, durationMinutes);
+      await loadCounts();
+    }, `Task hidden for ${durationLabel}.`, () => {
+      void handleUnhide(id);
+    });
+  };
+
+  const handleUnhide = async (id: number) => {
+    await runTaskAction(id, async () => {
+      await unhide(id);
+      await loadCounts();
+    }, 'Task unhidden.');
+  };
+
+  const handleFocusToggle = async (id: number, options?: { unhideFirst?: boolean }) => {
+    if (settings.focusedTaskId === id && !options?.unhideFirst) {
+      await runTaskAction(id, async () => {
+        await clearFocus();
+        await loadCounts();
+      });
+      return;
+    }
+
+    await runTaskAction(id, async () => {
+      if (options?.unhideFirst) {
+        await unhide(id);
+      }
+      await focus(id);
       await loadCounts();
     });
-  }, [loadCounts, runTaskAction, update]);
+  };
 
   const handleUncomplete = async (id: number) => {
     await runTaskAction(id, async () => {
@@ -445,13 +494,6 @@ export default function App() {
         return;
       }
 
-      // 'n' skips the current top task in Tasks
-      if (activeTab === 'tasks' && e.key.toLowerCase() === 'n' && !e.shiftKey && nextTask) {
-        e.preventDefault();
-        void handleSkip(nextTask.id);
-        return;
-      }
-
       // '?' shows shortcut help
       if (e.key === '?' && e.shiftKey) {
         e.preventDefault();
@@ -459,9 +501,9 @@ export default function App() {
         return;
       }
 
-      // 1-6 to switch tabs
+      // 1-7 to switch tabs
       const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= 6 && !e.shiftKey) {
+      if (num >= 1 && num <= TAB_ORDER.length && !e.shiftKey) {
         e.preventDefault();
         setActiveTab(TAB_ORDER[num - 1]);
         return;
@@ -470,7 +512,7 @@ export default function App() {
 
     document.addEventListener('keydown', handleKeyboard);
     return () => document.removeEventListener('keydown', handleKeyboard);
-  }, [activeTab, handleSkip, nextTask, showShortcutHelp]);
+  }, [activeTab, showShortcutHelp]);
 
   const showForm = activeTab === 'tasks' || activeTab === 'ideas';
 
@@ -534,12 +576,15 @@ export default function App() {
         onTabChange={setActiveTab}
         onUpdate={handleUpdate}
         onComplete={handleComplete}
-        onSkip={handleSkip}
+        onHide={handleHide}
+        onUnhide={handleUnhide}
+        onFocusToggle={handleFocusToggle}
         onUncomplete={handleUncomplete}
         onLoadBlockers={handleLoadBlockers}
         onAddBlocker={handleAddBlocker}
         onRemoveBlocker={handleRemoveBlocker}
         onPermanentDelete={handlePermanentDelete}
+        focusedTaskId={settings.focusedTaskId}
         onClearSearch={() => setSearchQuery('')}
       />
 
@@ -568,6 +613,11 @@ export default function App() {
                     Undo
                   </button>
                 )}
+                {t.onPermanentDelete && (
+                  <button className="toast-delete" onClick={() => { t.onPermanentDelete!(); dismissToast(t.id); }} aria-label="Permanently delete task">
+                    Permanently Delete
+                  </button>
+                )}
                 <button className="toast-close" onClick={() => dismissToast(t.id)} aria-label="Dismiss notification">
                   Close
                 </button>
@@ -582,8 +632,7 @@ export default function App() {
           <div className="shortcut-dialog" onClick={e => e.stopPropagation()}>
             <h2>Keyboard Shortcuts</h2>
             <div className="shortcut-list">
-              <div className="shortcut-item"><kbd>1</kbd>–<kbd>6</kbd><span>Switch tabs</span></div>
-              <div className="shortcut-item"><kbd>N</kbd><span>Next task</span></div>
+              <div className="shortcut-item"><kbd>1</kbd>–<kbd>7</kbd><span>Switch tabs</span></div>
               <div className="shortcut-item"><kbd>/</kbd><span>Focus new task input</span></div>
               <div className="shortcut-item"><kbd>?</kbd><span>Toggle this help</span></div>
               <div className="shortcut-item"><kbd>Esc</kbd><span>Close dialogs / cancel edit</span></div>

@@ -11,6 +11,7 @@ const TABS: { key: TabName; label: string }[] = [
   { key: 'backlog', label: 'Backlog' },
   { key: 'ideas', label: 'Ideas' },
   { key: 'blocked', label: 'Blocked' },
+  { key: 'hidden', label: 'Hidden' },
   { key: 'completed', label: 'Completed' },
   { key: 'archive', label: 'Archive' },
 ];

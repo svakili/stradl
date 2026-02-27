@@ -12,7 +12,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     updatedAt: '2026-02-20T09:00:00.000Z',
     completedAt: null,
     isArchived: false,
-    isDeleted: false,
+    hiddenUntilAt: null,
     ...overrides,
   };
 }
@@ -23,6 +23,7 @@ const baseSettings: Settings = {
   oneTimeOffsetHours: 0,
   oneTimeOffsetExpiresAt: null,
   vacationPromptLastShownForUpdatedAt: null,
+  focusedTaskId: null,
 };
 
 describe('getVacationNudgeRecommendation', () => {

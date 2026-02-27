@@ -1,9 +1,39 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { autoUnblock, hasUnresolvedBlockers, getPrioritizedTasks, PRIORITY_ORDER } from '../task-logic.js';
+import { autoUnblock, hasUnresolvedBlockers, isTaskBlocked, isTaskHiddenNow, getPrioritizedTasks, PRIORITY_ORDER } from '../task-logic.js';
 import { makeTask, makeBlocker, makeAppData, resetIdCounter } from './helpers.js';
 
 beforeEach(() => {
   resetIdCounter();
+});
+
+describe('isTaskBlocked', () => {
+  it('returns true for unresolved blockers', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1 })],
+      blockers: [makeBlocker({ taskId: 1, resolved: false })],
+    });
+    expect(isTaskBlocked(1, data)).toBe(true);
+  });
+
+  it('returns false when no unresolved blockers exist', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1 })],
+      blockers: [makeBlocker({ taskId: 1, resolved: true })],
+    });
+    expect(isTaskBlocked(1, data)).toBe(false);
+  });
+});
+
+describe('isTaskHiddenNow', () => {
+  it('returns true when hiddenUntilAt is in the future', () => {
+    const task = makeTask({ hiddenUntilAt: '2099-01-01T00:00:00Z' });
+    expect(isTaskHiddenNow(task, new Date('2026-01-01T00:00:00Z'))).toBe(true);
+  });
+
+  it('returns false when hiddenUntilAt is in the past', () => {
+    const task = makeTask({ hiddenUntilAt: '2020-01-01T00:00:00Z' });
+    expect(isTaskHiddenNow(task, new Date('2026-01-01T00:00:00Z'))).toBe(false);
+  });
 });
 
 describe('PRIORITY_ORDER', () => {
@@ -165,6 +195,13 @@ describe('getPrioritizedTasks', () => {
       expect(getPrioritizedTasks(data)).toHaveLength(0);
     });
 
+    it('excludes hidden tasks', () => {
+      const data = makeAppData({
+        tasks: [makeTask({ id: 1, hiddenUntilAt: '2099-01-01T00:00:00Z' })],
+      });
+      expect(getPrioritizedTasks(data)).toHaveLength(0);
+    });
+
     it('excludes tasks with unresolved blockers', () => {
       const data = makeAppData({
         tasks: [makeTask({ id: 1 })],
@@ -244,6 +281,7 @@ describe('getPrioritizedTasks', () => {
           oneTimeOffsetHours: 0,
           oneTimeOffsetExpiresAt: null,
           vacationPromptLastShownForUpdatedAt: null,
+          focusedTaskId: null,
         },
       });
 
@@ -272,6 +310,7 @@ describe('getPrioritizedTasks', () => {
           oneTimeOffsetHours: 0,
           oneTimeOffsetExpiresAt: null,
           vacationPromptLastShownForUpdatedAt: null,
+          focusedTaskId: null,
         },
       });
 

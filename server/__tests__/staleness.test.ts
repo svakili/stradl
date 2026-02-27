@@ -18,6 +18,7 @@ const baseSettings: Settings = {
   oneTimeOffsetHours: 0,
   oneTimeOffsetExpiresAt: null,
   vacationPromptLastShownForUpdatedAt: null,
+  focusedTaskId: null,
 };
 
 afterEach(() => {

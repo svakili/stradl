@@ -32,6 +32,9 @@ blockerRoutes.post('/tasks/:id/blockers', (req, res) => {
   };
 
   data.blockers.push(blocker);
+  if (data.settings.focusedTaskId === taskId) {
+    data.settings.focusedTaskId = null;
+  }
   writeData(data);
   res.status(201).json(blocker);
 });

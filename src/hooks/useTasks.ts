@@ -48,10 +48,30 @@ export function useTasks(tab: TabName) {
     await reload();
   };
 
+  const hide = async (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => {
+    await api.hideTask(id, durationMinutes);
+    await reload();
+  };
+
+  const unhide = async (id: number) => {
+    await api.unhideTask(id);
+    await reload();
+  };
+
+  const focus = async (id: number) => {
+    await api.focusTask(id);
+    await reload();
+  };
+
+  const clearFocus = async () => {
+    await api.clearFocusedTask();
+    await reload();
+  };
+
   const remove = async (id: number) => {
     await api.deleteTask(id);
     await reload();
   };
 
-  return { tasks, loading, reload, create, update, complete, uncomplete, remove };
+  return { tasks, loading, reload, create, update, complete, uncomplete, hide, unhide, focus, clearFocus, remove };
 }

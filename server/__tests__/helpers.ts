@@ -14,6 +14,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     updatedAt: now,
     completedAt: null,
     isArchived: false,
+    hiddenUntilAt: null,
     ...overrides,
   };
 }
@@ -40,6 +41,7 @@ export function makeAppData(overrides: Partial<AppData> = {}): AppData {
       oneTimeOffsetHours: 0,
       oneTimeOffsetExpiresAt: null,
       vacationPromptLastShownForUpdatedAt: null,
+      focusedTaskId: null,
     },
     nextTaskId: 100,
     nextBlockerId: 100,

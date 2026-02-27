@@ -53,6 +53,7 @@ describe('GET /settings', () => {
     expect(settings.oneTimeOffsetHours).toBe(0);
     expect(settings.oneTimeOffsetExpiresAt).toBeNull();
     expect(settings.vacationPromptLastShownForUpdatedAt).toBeNull();
+    expect(settings.focusedTaskId).toBeNull();
   });
 });
 
@@ -72,6 +73,7 @@ describe('PUT /settings', () => {
     expect(settings.oneTimeOffsetHours).toBe(0); // unchanged
     expect(settings.oneTimeOffsetExpiresAt).toBeNull(); // unchanged
     expect(settings.vacationPromptLastShownForUpdatedAt).toBeNull(); // unchanged
+    expect(settings.focusedTaskId).toBeNull(); // unchanged
   });
 
   it('updates multiple fields at once', () => {
@@ -104,6 +106,16 @@ describe('PUT /settings', () => {
     expect(res.json.mock.calls[0][0].vacationPromptLastShownForUpdatedAt).toBe('2026-02-20T08:00:00.000Z');
   });
 
+  it('updates focusedTaskId', () => {
+    const data = makeAppData();
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ body: { focusedTaskId: 3 } }), res);
+
+    expect(res.json.mock.calls[0][0].focusedTaskId).toBe(3);
+  });
+
   it('calls writeData with updated data', () => {
     const data = makeAppData();
     mockedReadData.mockReturnValue(data);
@@ -121,6 +133,7 @@ describe('PUT /settings', () => {
     const originalOneTimeOffset = data.settings.oneTimeOffsetHours;
     const originalExpiresAt = data.settings.oneTimeOffsetExpiresAt;
     const originalPromptAnchor = data.settings.vacationPromptLastShownForUpdatedAt;
+    const originalFocusedTaskId = data.settings.focusedTaskId;
     mockedReadData.mockReturnValue(data);
     const res = mockRes();
 
@@ -130,5 +143,6 @@ describe('PUT /settings', () => {
     expect(data.settings.oneTimeOffsetHours).toBe(originalOneTimeOffset);
     expect(data.settings.oneTimeOffsetExpiresAt).toBe(originalExpiresAt);
     expect(data.settings.vacationPromptLastShownForUpdatedAt).toBe(originalPromptAnchor);
+    expect(data.settings.focusedTaskId).toBe(originalFocusedTaskId);
   });
 });

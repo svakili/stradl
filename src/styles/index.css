@@ -332,6 +332,11 @@ textarea:focus-visible,
   box-shadow: 0 1px 3px var(--shadow-sm);
 }
 
+.task-row-focused {
+  border-color: var(--blue-600);
+  box-shadow: inset 0 0 0 2px var(--blue-600), 0 4px 12px var(--shadow-sm);
+}
+
 .task-row-pending {
   opacity: 0.75;
 }
@@ -375,6 +380,19 @@ textarea:focus-visible,
   color: var(--text-muted);
   background: var(--bg-input);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.task-now-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--blue-600);
+  color: white;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.1875rem 0.5rem;
+  text-transform: uppercase;
+  box-shadow: 0 1px 2px var(--shadow-sm);
 }
 
 .task-title-text {
@@ -474,6 +492,32 @@ textarea:focus-visible,
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.hide-menu {
+  position: relative;
+}
+
+.hide-menu-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 7.5rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 0.375rem;
+  box-shadow: 0 6px 16px var(--shadow-sm);
+  padding: 0.375rem;
+}
+
+.hide-menu-popover .btn {
+  width: 100%;
+  white-space: nowrap;
 }
 
 /* Task Timestamp */
@@ -797,6 +841,20 @@ textarea:focus-visible,
   text-decoration: underline;
 }
 
+.toast-delete {
+  border: none;
+  background: transparent;
+  color: var(--red-600);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0;
+}
+
+.toast-delete:hover {
+  text-decoration: underline;
+}
+
 .toast-close {
   border: none;
   background: transparent;
@@ -980,6 +1038,11 @@ textarea:focus-visible,
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.375rem;
+  }
+
+  .hide-menu-popover {
+    position: static;
+    margin-top: 0.375rem;
   }
 
   .priority-select {

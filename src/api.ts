@@ -41,6 +41,18 @@ export const completeTask = (id: number) =>
 export const uncompleteTask = (id: number) =>
   request<Task>(`/tasks/${id}/uncomplete`, { method: 'POST' });
 
+export const hideTask = (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) =>
+  request<Task>(`/tasks/${id}/hide`, { method: 'POST', body: JSON.stringify({ durationMinutes }) });
+
+export const unhideTask = (id: number) =>
+  request<Task>(`/tasks/${id}/unhide`, { method: 'POST' });
+
+export const focusTask = (id: number) =>
+  request<{ focusedTaskId: number | null }>(`/tasks/${id}/focus`, { method: 'POST' });
+
+export const clearFocusedTask = () =>
+  request<{ focusedTaskId: null }>('/tasks/focus/clear', { method: 'POST' });
+
 export const deleteTask = (id: number) =>
   request<void>(`/tasks/${id}`, { method: 'DELETE' });
 

@@ -72,6 +72,7 @@ describe('GET /tasks', () => {
         oneTimeOffsetHours: 0,
         oneTimeOffsetExpiresAt: null,
         vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: null,
       },
     });
     mockedReadData.mockReturnValue(data);
@@ -94,6 +95,7 @@ describe('GET /tasks', () => {
         oneTimeOffsetHours: 0,
         oneTimeOffsetExpiresAt: null,
         vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: null,
       },
     });
     mockedReadData.mockReturnValue(data);
@@ -138,6 +140,65 @@ describe('GET /tasks', () => {
     const blocked = res.json.mock.calls[0][0];
     expect(blocked).toHaveLength(1);
     expect(blocked[0].id).toBe(1);
+  });
+
+  it('excludes hidden tasks from tasks and backlog', () => {
+    const data = makeAppData({
+      tasks: [
+        makeTask({ id: 1, priority: 'P1', hiddenUntilAt: '2099-01-01T00:00:00Z' }),
+        makeTask({ id: 2, priority: 'P1', hiddenUntilAt: null }),
+      ],
+    });
+    mockedReadData.mockReturnValue(data);
+    const tasksRes = mockRes();
+    const backlogRes = mockRes();
+
+    handler(mockReq({ query: { tab: 'tasks' } }), tasksRes);
+    handler(mockReq({ query: { tab: 'backlog' } }), backlogRes);
+
+    expect(tasksRes.json.mock.calls[0][0].map((t: any) => t.id)).toEqual([2]);
+    expect(backlogRes.json.mock.calls[0][0]).toEqual([]);
+  });
+
+  it('returns currently hidden tasks on hidden tab', () => {
+    const data = makeAppData({
+      tasks: [
+        makeTask({ id: 1, hiddenUntilAt: '2099-01-01T00:00:00Z' }),
+        makeTask({ id: 2, hiddenUntilAt: null }),
+      ],
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ query: { tab: 'hidden' } }), res);
+
+    expect(res.json.mock.calls[0][0]).toHaveLength(1);
+    expect(res.json.mock.calls[0][0][0].id).toBe(1);
+  });
+
+  it('excludes expired hidden tasks from hidden tab', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1, hiddenUntilAt: '2020-01-01T00:00:00Z' })],
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ query: { tab: 'hidden' } }), res);
+
+    expect(res.json.mock.calls[0][0]).toEqual([]);
+  });
+
+  it('does not include blocked hidden tasks on hidden tab', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1, hiddenUntilAt: '2099-01-01T00:00:00Z' })],
+      blockers: [makeBlocker({ taskId: 1, resolved: false })],
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ query: { tab: 'hidden' } }), res);
+
+    expect(res.json.mock.calls[0][0]).toEqual([]);
   });
 
   it('returns completed tasks sorted newest first', () => {
@@ -200,6 +261,27 @@ describe('GET /tasks', () => {
     expect(mockedWriteData).not.toHaveBeenCalled();
   });
 
+  it('clears invalid focusedTaskId during read', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1, isArchived: true })],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ query: { tab: 'tasks' } }), res);
+
+    expect(data.settings.focusedTaskId).toBeNull();
+    expect(mockedWriteData).toHaveBeenCalled();
+  });
+
   it('returns empty array for unknown tab', () => {
     const data = makeAppData({ tasks: [makeTask({ id: 1 })] });
     mockedReadData.mockReturnValue(data);
@@ -244,6 +326,7 @@ describe('POST /tasks', () => {
     expect(task.priority).toBe(null);
     expect(task.completedAt).toBe(null);
     expect(task.isArchived).toBe(false);
+    expect(task.hiddenUntilAt).toBe(null);
   });
 
   it('trims the title', () => {
@@ -393,6 +476,28 @@ describe('PUT /tasks/:id', () => {
     expect(res.json.mock.calls[0][0].isArchived).toBe(true);
   });
 
+  it('clears hiddenUntilAt and focusedTaskId when archiving', () => {
+    const task = makeTask({ id: 1, isArchived: false, hiddenUntilAt: '2099-01-01T00:00:00Z' });
+    const data = makeAppData({
+      tasks: [task],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { isArchived: true } }), res);
+
+    expect(res.json.mock.calls[0][0].hiddenUntilAt).toBeNull();
+    expect(data.settings.focusedTaskId).toBeNull();
+  });
+
   it('resolves dependent blockers on archive', () => {
     const task = makeTask({ id: 1, isArchived: false });
     const blocker = makeBlocker({ taskId: 2, blockedByTaskId: 1, resolved: false });
@@ -452,6 +557,27 @@ describe('POST /tasks/:id/complete', () => {
     expect(unrelatedBlocker.resolved).toBe(false);
   });
 
+  it('clears focusedTaskId when completing focused task', () => {
+    const task = makeTask({ id: 1 });
+    const data = makeAppData({
+      tasks: [task],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(data.settings.focusedTaskId).toBeNull();
+  });
+
   it('returns 404 for nonexistent task', () => {
     const data = makeAppData();
     mockedReadData.mockReturnValue(data);
@@ -499,6 +625,161 @@ describe('POST /tasks/:id/uncomplete', () => {
   });
 });
 
+describe('POST /tasks/:id/hide', () => {
+  const handler = findHandler('post', '/tasks/:id/hide');
+
+  it('hides an active prioritized task', () => {
+    const task = makeTask({ id: 1, priority: 'P1', hiddenUntilAt: null });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { durationMinutes: 30 } }), res);
+
+    expect(res.json.mock.calls[0][0].hiddenUntilAt).not.toBeNull();
+  });
+
+  it('rejects invalid durations', () => {
+    const task = makeTask({ id: 1, priority: 'P1' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { durationMinutes: 10 } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects non-prioritized tasks', () => {
+    const task = makeTask({ id: 1, priority: null });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { durationMinutes: 15 } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('clears focusedTaskId when hiding focused task', () => {
+    const task = makeTask({ id: 1, priority: 'P1' });
+    const data = makeAppData({
+      tasks: [task],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { durationMinutes: 15 } }), res);
+
+    expect(data.settings.focusedTaskId).toBeNull();
+  });
+
+  it('returns 404 when task does not exist', () => {
+    const data = makeAppData();
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '999' }, body: { durationMinutes: 15 } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe('POST /tasks/:id/unhide', () => {
+  const handler = findHandler('post', '/tasks/:id/unhide');
+
+  it('clears hiddenUntilAt', () => {
+    const task = makeTask({ id: 1, hiddenUntilAt: '2099-01-01T00:00:00Z' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(res.json.mock.calls[0][0].hiddenUntilAt).toBeNull();
+  });
+});
+
+describe('POST /tasks/:id/focus', () => {
+  const handler = findHandler('post', '/tasks/:id/focus');
+
+  it('sets focusedTaskId', () => {
+    const task = makeTask({ id: 1, priority: 'P1', hiddenUntilAt: null });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(data.settings.focusedTaskId).toBe(1);
+  });
+
+  it('replaces previous focusedTaskId', () => {
+    const data = makeAppData({
+      tasks: [makeTask({ id: 1 }), makeTask({ id: 2 })],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 2,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(data.settings.focusedTaskId).toBe(1);
+  });
+
+  it('rejects hidden tasks', () => {
+    const task = makeTask({ id: 1, priority: 'P1', hiddenUntilAt: '2099-01-01T00:00:00Z' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+});
+
+describe('POST /tasks/focus/clear', () => {
+  const handler = findHandler('post', '/tasks/focus/clear');
+
+  it('clears focusedTaskId', () => {
+    const task = makeTask({ id: 1 });
+    const data = makeAppData({
+      tasks: [task],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq(), res);
+
+    expect(data.settings.focusedTaskId).toBeNull();
+    expect(res.json.mock.calls[0][0].focusedTaskId).toBeNull();
+  });
+});
+
 describe('DELETE /tasks/:id', () => {
   const handler = findHandler('delete', '/tasks/:id');
 
@@ -528,6 +809,27 @@ describe('DELETE /tasks/:id', () => {
 
     expect(data.blockers).toHaveLength(1);
     expect(data.blockers[0].id).toBe(12);
+  });
+
+  it('clears focusedTaskId when deleting focused task', () => {
+    const task = makeTask({ id: 1 });
+    const data = makeAppData({
+      tasks: [task],
+      settings: {
+        staleThresholdHours: 48,
+        topN: 20,
+        oneTimeOffsetHours: 0,
+        oneTimeOffsetExpiresAt: null,
+        vacationPromptLastShownForUpdatedAt: null,
+        focusedTaskId: 1,
+      },
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(data.settings.focusedTaskId).toBeNull();
   });
 
   it('returns 404 for nonexistent task', () => {
