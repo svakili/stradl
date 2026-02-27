@@ -359,11 +359,30 @@ textarea:focus-visible,
   min-width: 0;
 }
 
-.task-title span {
+.task-title-display {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.task-id-badge {
+  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.task-title-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
+  min-width: 0;
 }
 
 /* Status section - full width below title row */
@@ -500,6 +519,16 @@ textarea:focus-visible,
   align-items: center;
 }
 
+.blocker-task-picker {
+  position: relative;
+  min-width: 260px;
+  flex: 1;
+}
+
+.blocker-task-input {
+  width: 100%;
+}
+
 .blocker-form select,
 .blocker-form input {
   padding: 0.25rem 0.375rem;
@@ -508,6 +537,50 @@ textarea:focus-visible,
   font-size: 0.8125rem;
   background: var(--bg-input);
   color: var(--text-primary);
+}
+
+.blocker-task-results {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 20;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 0.375rem;
+  box-shadow: 0 6px 16px var(--shadow-sm);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.blocker-task-option {
+  min-height: 36px;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.125rem;
+}
+
+.blocker-task-option:hover,
+.blocker-task-option-active {
+  background: var(--blocker-bg);
+}
+
+.blocker-task-meta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.blocker-task-error {
+  font-size: 0.75rem;
+  color: var(--red-700);
+  margin-top: 0.25rem;
 }
 
 .duration-presets {
@@ -898,7 +971,7 @@ textarea:focus-visible,
     gap: 0.5rem;
   }
 
-  .task-title span {
+  .task-title-text {
     white-space: normal;
   }
 
@@ -925,6 +998,16 @@ textarea:focus-visible,
   .blocker-form {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .blocker-task-picker {
+    min-width: 0;
+  }
+
+  .blocker-task-results {
+    position: static;
+    margin-top: 0.25rem;
+    max-height: 180px;
   }
 
   .btn,
