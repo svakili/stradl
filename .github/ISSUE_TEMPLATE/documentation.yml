@@ -1,0 +1,28 @@
+name: Documentation improvement
+description: Suggest improvements to docs or contributor guidance
+title: "[Docs]: "
+labels:
+  - type:docs
+body:
+  - type: textarea
+    id: issue
+    attributes:
+      label: What documentation needs improvement?
+      description: Describe what is missing, unclear, or incorrect.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested change
+      description: Share your proposed wording or structure.
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Relevant file(s)
+      description: Which files are affected?
+      placeholder: README.md, CONTRIBUTING.md

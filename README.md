@@ -1,6 +1,11 @@
 # Stradl
 
+[![CI](https://github.com/svakili/stradl/actions/workflows/ci.yml/badge.svg)](https://github.com/svakili/stradl/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A single-user local task management web app for multitasking. Tracks tasks with priorities (P0/P1/P2/Ideas), free-text statuses, blocking relationships, and staleness indicators. Installable as a PWA.
+
+> Project status: early-stage. Current contribution scope is intentionally narrow to docs and small fixes. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Prerequisites
 
@@ -14,6 +19,13 @@ npm run dev
 ```
 
 This starts the Express API server on port 3001 and the Vite dev server on port 5173 with hot module replacement. Open http://localhost:5173.
+
+## Platform Support
+
+- Development workflow: cross-platform (macOS, Linux, Windows with Node 18+)
+- Runtime operational extras: macOS-only
+  - LaunchAgent auto-start scripts
+  - In-app self-update flow that restarts via `launchctl`
 
 ## Production
 
@@ -44,8 +56,9 @@ npm run release:major
 Notes:
 - Requires `gh` authenticated (`gh auth status`)
 - Release tags are `v<version>` and match `package.json` version
+- Intended for maintainers
 
-## Auto-Start on Login (macOS)
+## Auto-Start on Login (macOS-only runtime feature)
 
 ```bash
 npm run install-service
@@ -59,7 +72,7 @@ To disable:
 npm run uninstall-service
 ```
 
-## In-App Self-Update (macOS)
+## In-App Self-Update (macOS-only runtime feature)
 
 The Settings panel can check for updates and apply the latest `origin/main` automatically.
 
@@ -98,6 +111,13 @@ If preflight checks fail, the API returns a clear error:
 - **Vacation mode** -- Add offset hours so tasks don't go stale while you're away
 - **Top N limiting** -- Only show the top N tasks in the Tasks tab
 - **PWA** -- Installable from the browser for a native app feel
+
+## Contributing
+
+- Contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Code of conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- Security policy: [SECURITY.md](./SECURITY.md)
+- Support policy: [SUPPORT.md](./SUPPORT.md)
 
 ## Project Structure
 
