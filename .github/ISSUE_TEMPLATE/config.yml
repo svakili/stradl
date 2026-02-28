@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support and usage questions
+    url: https://github.com/svakili/stradl/blob/main/SUPPORT.md
+    about: Read support guidance before opening an issue.
+  - name: Security vulnerability reporting
+    url: https://github.com/svakili/stradl/blob/main/SECURITY.md
+    about: Report vulnerabilities privately per the security policy.

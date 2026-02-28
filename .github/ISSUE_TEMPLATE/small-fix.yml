@@ -1,0 +1,33 @@
+name: Small fix proposal
+description: Propose a small bug fix or small UX polish change
+title: "[Small Fix]: "
+labels:
+  - scope:small-fix
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Stradl currently accepts docs and small-fix contributions.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user-visible issue does this fix?
+    validations:
+      required: true
+
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed solution
+      description: Keep the scope narrow and implementation-focused.
+    validations:
+      required: true
+
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: What will this proposal explicitly not change?
+      placeholder: No refactors, no new feature scope.
