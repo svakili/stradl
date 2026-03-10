@@ -70,6 +70,7 @@ export default function TaskRow({
   const [showBlockers, setShowBlockers] = useState(activeTab === 'blocked');
   const [showHideMenu, setShowHideMenu] = useState(false);
   const skipNextTitleBlurSaveRef = useRef(false);
+  const skipNextStatusBlurSaveRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hideMenuRef = useRef<HTMLDivElement>(null);
 
@@ -150,6 +151,7 @@ export default function TaskRow({
   };
 
   const cancelStatusEdit = () => {
+    skipNextStatusBlurSaveRef.current = true;
     setEditingStatus(false);
     setStatusValue(task.status);
   };
@@ -367,6 +369,13 @@ export default function TaskRow({
               ref={textareaRef}
               autoFocus
               value={statusValue}
+              onBlur={() => {
+                if (skipNextStatusBlurSaveRef.current) {
+                  skipNextStatusBlurSaveRef.current = false;
+                  return;
+                }
+                void saveStatus();
+              }}
               onChange={(e) => {
                 setStatusValue(e.target.value);
                 autoResizeTextarea(e.target);
