@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { readData, writeData } from '../storage.js';
+import { hasUnresolvedBlockers } from '../task-logic.js';
 
 export const blockerRoutes = Router();
 
@@ -50,7 +51,17 @@ blockerRoutes.delete('/blockers/:id', (req, res) => {
     return;
   }
 
+  const taskId = data.blockers[idx].taskId;
   data.blockers.splice(idx, 1);
+
+  // If the task has no more unresolved blockers, touch updatedAt so it isn't stale
+  if (!hasUnresolvedBlockers(taskId, data)) {
+    const task = data.tasks.find(t => t.id === taskId);
+    if (task) {
+      task.updatedAt = new Date().toISOString();
+    }
+  }
+
   writeData(data);
   res.status(204).end();
 });

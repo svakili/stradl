@@ -5,6 +5,7 @@ export const PRIORITY_ORDER: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
 export function autoUnblock(data: AppData): boolean {
   const now = new Date();
   let changed = false;
+  const newlyUnblockedTaskIds = new Set<number>();
 
   for (const blocker of data.blockers) {
     if (blocker.resolved) continue;
@@ -13,6 +14,7 @@ export function autoUnblock(data: AppData): boolean {
     if (blocker.blockedUntilDate && new Date(blocker.blockedUntilDate) <= now) {
       blocker.resolved = true;
       changed = true;
+      newlyUnblockedTaskIds.add(blocker.taskId);
     }
 
     // Task-based auto-unblock
@@ -21,6 +23,17 @@ export function autoUnblock(data: AppData): boolean {
       if (blockingTask && blockingTask.completedAt != null) {
         blocker.resolved = true;
         changed = true;
+        newlyUnblockedTaskIds.add(blocker.taskId);
+      }
+    }
+  }
+
+  // Touch updatedAt for tasks that are now fully unblocked so they aren't stale
+  for (const taskId of newlyUnblockedTaskIds) {
+    if (!hasUnresolvedBlockers(taskId, data)) {
+      const task = data.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.updatedAt = now.toISOString();
       }
     }
   }

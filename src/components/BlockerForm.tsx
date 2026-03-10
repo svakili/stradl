@@ -176,8 +176,8 @@ export default function BlockerForm({ taskId, allTasks, isDisabled = false, onAd
     if (blockerType === 'task') {
       await handleTaskAdd();
     } else if (blockerType === 'date' && selectedDate) {
-      const localEndOfDay = new Date(`${selectedDate}T23:59:59.999`);
-      await onAdd({ blockedUntilDate: localEndOfDay.toISOString() });
+      const localStartOfDay = new Date(`${selectedDate}T00:00:00.000`);
+      await onAdd({ blockedUntilDate: localStartOfDay.toISOString() });
       setSelectedDate('');
     }
   };
