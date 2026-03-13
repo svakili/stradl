@@ -1,6 +1,7 @@
 node_modules
 dist
 server/dist
+release
 data/tasks.json
 data/server.log
 data/server-error.log

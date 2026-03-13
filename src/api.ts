@@ -3,12 +3,21 @@ import type {
   Blocker,
   Settings,
   TabName,
+  RuntimeInfo,
+  StoredAppData,
   UpdateCheckResult,
   UpdateApplyStartResult,
   UpdateApplyStatus,
+  DataSnapshotResult,
+  DataImportResult,
 } from './types';
 
 const BASE = '/api';
+
+function getDesktopApi() {
+  if (typeof window === 'undefined') return null;
+  return window.stradlDesktop ?? null;
+}
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
@@ -76,12 +85,48 @@ export const fetchSettings = () =>
 export const updateSettings = (data: Partial<Settings>) =>
   request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(data) });
 
+// Runtime
+export const fetchRuntimeInfo = async (): Promise<RuntimeInfo> => {
+  const desktopApi = getDesktopApi();
+  if (desktopApi) {
+    return desktopApi.getRuntimeInfo();
+  }
+
+  return {
+    mode: 'web',
+    appVersion: 'web',
+    canSelfUpdate: false,
+  };
+};
+
 // Updates
 export const checkForUpdates = () =>
-  request<UpdateCheckResult>('/update-check');
+  getDesktopApi()
+    ? getDesktopApi()!.checkForUpdates()
+    : request<UpdateCheckResult>('/update-check');
 
 export const applyUpdate = () =>
-  request<UpdateApplyStartResult>('/update-apply', { method: 'POST' });
+  getDesktopApi()
+    ? getDesktopApi()!.applyUpdate()
+    : request<UpdateApplyStartResult>('/update-apply', { method: 'POST' });
 
 export const fetchUpdateApplyStatus = () =>
-  request<UpdateApplyStatus>('/update-apply-status');
+  getDesktopApi()
+    ? getDesktopApi()!.getUpdateStatus()
+    : request<UpdateApplyStatus>('/update-apply-status');
+
+// Data portability
+export const exportData = () =>
+  request<StoredAppData>('/data/export');
+
+export const createDataSnapshot = (reason: string) =>
+  request<DataSnapshotResult>('/data/snapshot', {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export const importData = (data: StoredAppData) =>
+  request<DataImportResult>('/data/import', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });

@@ -33,6 +33,7 @@ export function makeBlocker(overrides: Partial<Blocker> = {}): Blocker {
 
 export function makeAppData(overrides: Partial<AppData> = {}): AppData {
   return {
+    schemaVersion: 1,
     tasks: [],
     blockers: [],
     settings: {

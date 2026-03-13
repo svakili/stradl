@@ -33,6 +33,20 @@ export function useApplyUpdate() {
   }, []);
 
   useEffect(() => {
+    void refreshStatus({ suppressError: true }).catch(() => undefined);
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    const desktopApi = window.stradlDesktop;
+    if (!desktopApi?.onUpdateStatus) return;
+
+    return desktopApi.onUpdateStatus((next) => {
+      setStatus(next);
+      setError(null);
+    });
+  }, []);
+
+  useEffect(() => {
     if (status?.state !== 'running') return;
 
     const timer = window.setInterval(() => {

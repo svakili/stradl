@@ -27,6 +27,21 @@ export interface Settings {
   focusedTaskId: number | null;
 }
 
+export interface StoredAppData {
+  schemaVersion: number;
+  tasks: Task[];
+  blockers: Blocker[];
+  settings: Settings;
+  nextTaskId: number;
+  nextBlockerId: number;
+}
+
+export interface RuntimeInfo {
+  mode: 'desktop-local' | 'web';
+  appVersion: string;
+  canSelfUpdate: boolean;
+}
+
 export interface UpdateCheckResult {
   currentVersion: string;
   latestVersion: string;
@@ -54,6 +69,19 @@ export interface UpdateApplyStatus {
   finishedAt?: string;
   fromVersion?: string;
   toVersion?: string;
+}
+
+export interface DataSnapshotResult {
+  snapshotPath: string;
+  createdAt: string;
+  reason: string;
+}
+
+export interface DataImportResult {
+  importedTaskCount: number;
+  importedBlockerCount: number;
+  backupPath: string;
+  backupCreatedAt: string;
 }
 
 export type TabName = 'tasks' | 'backlog' | 'ideas' | 'blocked' | 'hidden' | 'completed' | 'archive';

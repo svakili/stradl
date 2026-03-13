@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { TabName, Task, Settings } from './types';
+import type { TabName, Task, Settings, RuntimeInfo, StoredAppData } from './types';
 import { useTasks } from './hooks/useTasks';
 import { useSettings } from './hooks/useSettings';
 import { useBlockers } from './hooks/useBlockers';
@@ -56,6 +56,9 @@ export default function App() {
   const [vacationInactivityDays, setVacationInactivityDays] = useState(1);
   const [vacationAnchorUpdatedAt, setVacationAnchorUpdatedAt] = useState<string | null>(null);
   const [vacationNudgeSaving, setVacationNudgeSaving] = useState(false);
+  const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [isImportingData, setIsImportingData] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('stradl-theme');
     if (saved === 'dark' || saved === 'light') return saved;
@@ -133,8 +136,34 @@ export default function App() {
   }, [toasts, dismissToast]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const info = await api.fetchRuntimeInfo();
+        if (!cancelled) {
+          setRuntimeInfo(info);
+        }
+      } catch {
+        if (!cancelled) {
+          setRuntimeInfo({
+            mode: 'web',
+            appVersion: 'web',
+            canSelfUpdate: false,
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!runtimeInfo?.canSelfUpdate) return;
     void maybeAutoCheck();
-  }, [maybeAutoCheck]);
+  }, [maybeAutoCheck, runtimeInfo?.canSelfUpdate]);
 
   useEffect(() => {
     if (!updateCheckResult?.hasUpdate) return;
@@ -403,6 +432,16 @@ export default function App() {
     if (handledUpdateSuccessRef.current === successKey) return;
     handledUpdateSuccessRef.current = successKey;
 
+    if (runtimeInfo?.mode === 'desktop-local') {
+      showToast(
+        updateApplyStatus.toVersion
+          ? `Update applied. Running v${updateApplyStatus.toVersion}.`
+          : 'Update applied successfully.',
+        'success'
+      );
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       showToast('Update applied. Reloading latest version...', 'success');
@@ -431,7 +470,54 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [showToast, updateApplyStatus]);
+  }, [runtimeInfo?.mode, showToast, updateApplyStatus]);
+
+  const handleExportData = useCallback(async () => {
+    if (isExportingData) return;
+
+    setIsExportingData(true);
+    try {
+      const data = await api.exportData();
+      const contents = JSON.stringify(data, null, 2);
+      const blob = new Blob([contents], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `stradl-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Backup exported.', 'success');
+    } catch (error) {
+      const message = `Failed to export tasks: ${getErrorMessage(error)}`;
+      showToast(message, 'error');
+      throw new Error(message);
+    } finally {
+      setIsExportingData(false);
+    }
+  }, [isExportingData, showToast]);
+
+  const handleImportData = useCallback(async (data: StoredAppData) => {
+    if (isImportingData) return;
+
+    setIsImportingData(true);
+    try {
+      const result = await api.importData(data);
+      await Promise.all([reload(), reloadSettings(), loadCounts()]);
+      setSearchQuery('');
+      showToast(
+        `Imported ${result.importedTaskCount} tasks. Backup saved to ${result.backupPath}.`,
+        'success'
+      );
+    } catch (error) {
+      const message = `Failed to import tasks: ${getErrorMessage(error)}`;
+      showToast(message, 'error');
+      throw new Error(message);
+    } finally {
+      setIsImportingData(false);
+    }
+  }, [isImportingData, loadCounts, reload, reloadSettings, showToast]);
 
   const handleApplyVacationNudge = async (days: number) => {
     if (!vacationAnchorUpdatedAt) return;
@@ -554,6 +640,7 @@ export default function App() {
           <SettingsPanel
             settings={settings}
             onSave={handleSaveSettings}
+            runtimeInfo={runtimeInfo}
             updateCheckResult={updateCheckResult}
             updateCheckError={updateCheckError}
             updateLastCheckedAt={updateLastCheckedAt}
@@ -563,6 +650,10 @@ export default function App() {
             updateApplyError={updateApplyError}
             isApplyingUpdate={isApplyingUpdate}
             onApplyUpdate={handleApplyUpdate}
+            isExportingData={isExportingData}
+            isImportingData={isImportingData}
+            onExportData={handleExportData}
+            onImportData={handleImportData}
           />
         </div>
       </header>
