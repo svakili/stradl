@@ -1,9 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
-import type { Settings, UpdateCheckResult, UpdateApplyStatus } from '../types';
+import type { ChangeEvent } from 'react';
+import type {
+  Settings,
+  RuntimeInfo,
+  StoredAppData,
+  UpdateCheckResult,
+  UpdateApplyStatus,
+} from '../types';
 
 interface Props {
   settings: Settings;
   onSave: (data: Partial<Settings>) => Promise<void>;
+  runtimeInfo: RuntimeInfo | null;
   updateCheckResult: UpdateCheckResult | null;
   updateCheckError: string | null;
   updateLastCheckedAt: string | null;
@@ -13,6 +21,10 @@ interface Props {
   updateApplyError: string | null;
   isApplyingUpdate: boolean;
   onApplyUpdate: () => Promise<void>;
+  isExportingData: boolean;
+  isImportingData: boolean;
+  onExportData: () => Promise<void>;
+  onImportData: (data: StoredAppData) => Promise<void>;
 }
 
 interface SettingsDraft {
@@ -35,6 +47,7 @@ function toDraft(settings: Settings): SettingsDraft {
 export default function SettingsPanel({
   settings,
   onSave,
+  runtimeInfo,
   updateCheckResult,
   updateCheckError,
   updateLastCheckedAt,
@@ -44,13 +57,19 @@ export default function SettingsPanel({
   updateApplyError,
   isApplyingUpdate,
   onApplyUpdate,
+  isExportingData,
+  isImportingData,
+  onExportData,
+  onImportData,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<SettingsDraft>(toDraft(settings));
   const [errors, setErrors] = useState<SettingsErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [dataTransferError, setDataTransferError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -70,6 +89,7 @@ export default function SettingsPanel({
     setDraft(toDraft(settings));
     setErrors({});
     setSubmitError(null);
+    setDataTransferError(null);
   }, [settings, open]);
 
   const validate = (): { nextSettings: Partial<Settings> | null; nextErrors: SettingsErrors } => {
@@ -130,11 +150,18 @@ export default function SettingsPanel({
     setOpen(false);
   };
 
-  const updateStatus = updateCheckResult == null
-    ? 'Check for updates to see the latest available release.'
-    : updateCheckResult.hasUpdate
-      ? `Update available: v${updateCheckResult.latestVersion}.`
-      : `You're up to date (v${updateCheckResult.currentVersion}).`;
+  const isDesktopRuntime = runtimeInfo?.mode === 'desktop-local';
+  const canSelfUpdate = runtimeInfo?.canSelfUpdate === true;
+
+  const updateStatus = !isDesktopRuntime
+    ? 'Desktop self-update is available in the packaged app.'
+    : !canSelfUpdate
+      ? 'Self-update is unavailable until the packaged app is installed in ~/Applications.'
+    : updateCheckResult == null
+      ? 'Check for updates to see the latest available release.'
+      : updateCheckResult.hasUpdate
+        ? `Update available: v${updateCheckResult.latestVersion}.`
+        : `You're up to date (v${updateCheckResult.currentVersion}).`;
 
   const applyStatus = updateApplyStatus == null
     ? null
@@ -145,6 +172,27 @@ export default function SettingsPanel({
         : updateApplyStatus.state === 'failed'
           ? 'Update failed.'
           : null;
+
+  const handleImportSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || isImportingData) return;
+
+    setDataTransferError(null);
+
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw) as StoredAppData;
+      const confirmed = window.confirm(
+        'Importing replaces the current tasks file. A backup will be created automatically first. Continue?'
+      );
+      if (!confirmed) return;
+
+      await onImportData(parsed);
+      event.target.value = '';
+    } catch (error) {
+      setDataTransferError(error instanceof Error ? error.message : 'Failed to import data.');
+    }
+  };
 
   return (
     <div className="settings-panel" ref={panelRef}>
@@ -183,7 +231,10 @@ export default function SettingsPanel({
           <div className="settings-updates-section">
             <h3 className="settings-updates-title">App Updates</h3>
             <p className="settings-help">
-              Current version: <strong>{updateCheckResult?.currentVersion || 'Unknown'}</strong>
+              Runtime: <strong>{isDesktopRuntime ? 'Desktop app' : 'Web/PWA'}</strong>
+            </p>
+            <p className="settings-help">
+              Current version: <strong>{runtimeInfo?.appVersion || updateCheckResult?.currentVersion || 'Unknown'}</strong>
             </p>
             <p className="settings-help">
               Latest version: <strong>{updateCheckResult?.latestVersion || 'Unknown'}</strong>
@@ -204,20 +255,20 @@ export default function SettingsPanel({
               <button
                 className="btn btn-sm"
                 onClick={() => { void onCheckForUpdates(); }}
-                disabled={saving || isCheckingUpdates || isApplyingUpdate}
+                disabled={saving || isCheckingUpdates || isApplyingUpdate || !isDesktopRuntime}
               >
                 {isCheckingUpdates ? 'Checking...' : 'Check for updates'}
               </button>
-              {updateCheckResult?.hasUpdate && (
+              {isDesktopRuntime && updateCheckResult?.hasUpdate && (
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={() => { void onApplyUpdate(); }}
-                  disabled={saving || isApplyingUpdate}
+                  disabled={saving || isApplyingUpdate || !canSelfUpdate}
                 >
                   {isApplyingUpdate ? 'Applying...' : 'Update now'}
                 </button>
               )}
-              {updateCheckResult?.hasUpdate && (
+              {isDesktopRuntime && updateCheckResult?.hasUpdate && (
                 <a
                   className="btn btn-sm"
                   href={updateCheckResult.releaseUrl}
@@ -227,6 +278,37 @@ export default function SettingsPanel({
                   View release notes
                 </a>
               )}
+            </div>
+          </div>
+
+          <div className="settings-updates-section">
+            <h3 className="settings-updates-title">Task Backup & Move</h3>
+            <p className="settings-help">
+              Export a full JSON backup before switching installs or machines. Import replaces the current task file after creating an automatic backup.
+            </p>
+            {dataTransferError && <p className="settings-error">{dataTransferError}</p>}
+            <div className="settings-update-actions">
+              <button
+                className="btn btn-sm"
+                onClick={() => { void onExportData(); }}
+                disabled={saving || isExportingData || isImportingData}
+              >
+                {isExportingData ? 'Exporting...' : 'Export tasks'}
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={() => importInputRef.current?.click()}
+                disabled={saving || isExportingData || isImportingData}
+              >
+                {isImportingData ? 'Importing...' : 'Import tasks'}
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                onChange={(event) => { void handleImportSelection(event); }}
+              />
             </div>
           </div>
 
