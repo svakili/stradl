@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { Task, Settings, Blocker, TabName } from '../types';
 import { isStale } from '../utils/staleness';
 import { linkifyText } from '../utils/linkify';
@@ -19,6 +19,7 @@ interface Props {
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onHide: (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => Promise<void>;
+  onHideUntilDate: (id: number, date: string) => Promise<void>;
   onUnhide: (id: number) => Promise<void>;
   onFocusToggle: (id: number, options?: { unhideFirst?: boolean }) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
@@ -46,21 +47,37 @@ function formatHiddenTimestamp(hiddenUntilAt: string | null): string {
   const until = new Date(hiddenUntilAt);
   if (Number.isNaN(until.getTime())) return 'Hidden temporarily';
 
-  const now = Date.now();
-  const remainingMs = until.getTime() - now;
-  const hiddenUntilLabel = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const now = new Date();
+  const remainingMs = until.getTime() - now.getTime();
 
-  if (remainingMs <= 0) return `Hidden until ${hiddenUntilLabel} (returning now)`;
-  const remainingMinutes = Math.ceil(remainingMs / 60000);
-  if (remainingMinutes < 60) return `Hidden until ${hiddenUntilLabel} (in ${remainingMinutes}m)`;
+  if (remainingMs <= 0) {
+    const label = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return `Hidden until ${label} (returning now)`;
+  }
 
-  const remainingHours = Math.ceil(remainingMinutes / 60);
-  return `Hidden until ${hiddenUntilLabel} (in ${remainingHours}h)`;
+  const isToday = until.toDateString() === now.toDateString();
+
+  if (isToday) {
+    const hiddenUntilLabel = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const remainingMinutes = Math.ceil(remainingMs / 60000);
+    if (remainingMinutes < 60) return `Hidden until ${hiddenUntilLabel} (in ${remainingMinutes}m)`;
+    const remainingHours = Math.ceil(remainingMinutes / 60);
+    return `Hidden until ${hiddenUntilLabel} (in ${remainingHours}h)`;
+  }
+
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  if (until.toDateString() === tomorrowDate.toDateString()) {
+    return 'Hidden until tomorrow';
+  }
+
+  const dateLabel = until.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `Hidden until ${dateLabel}`;
 }
 
 export default function TaskRow({
   task, settings, showStaleness, isPending, isFocused, allTasks, blockers, activeTab, recentlyUpdated,
-  onUpdate, onComplete, onHide, onUnhide, onFocusToggle, onUncomplete,
+  onUpdate, onComplete, onHide, onHideUntilDate, onUnhide, onFocusToggle, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete,
 }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -69,10 +86,24 @@ export default function TaskRow({
   const [statusValue, setStatusValue] = useState(task.status);
   const [showBlockers, setShowBlockers] = useState(activeTab === 'blocked');
   const [showHideMenu, setShowHideMenu] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [hideDateValue, setHideDateValue] = useState('');
   const skipNextTitleBlurSaveRef = useRef(false);
   const skipNextStatusBlurSaveRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hideMenuRef = useRef<HTMLDivElement>(null);
+
+  const tomorrow = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const minPickerDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    return d.toISOString().slice(0, 10);
+  }, []);
 
   const stale = showStaleness && isStale(task.updatedAt, settings);
   const bgColor = stale ? 'var(--row-stale)' : (task.priority ? ROW_COLORS[task.priority] : 'var(--row-idea)');
@@ -91,6 +122,7 @@ export default function TaskRow({
       if (!hideMenuRef.current) return;
       if (!hideMenuRef.current.contains(event.target as Node)) {
         setShowHideMenu(false);
+        setShowDatePicker(false);
       }
     };
 
@@ -297,16 +329,21 @@ export default function TaskRow({
               <div className="hide-menu" ref={hideMenuRef}>
                 <button
                   className="btn btn-sm btn-primary"
-                  onClick={() => setShowHideMenu(prev => !prev)}
+                  onClick={() => {
+                    setShowHideMenu(prev => {
+                      if (prev) setShowDatePicker(false);
+                      return !prev;
+                    });
+                  }}
                   disabled={isPending}
                   aria-haspopup="menu"
                   aria-expanded={showHideMenu}
-                  aria-label={`Hide ${task.title} for a short duration`}
+                  aria-label={`Hide ${task.title}`}
                 >
                   Hide
                 </button>
                 {showHideMenu && (
-                  <div className="hide-menu-popover" role="menu" aria-label={`Hide durations for ${task.title}`}>
+                  <div className="hide-menu-popover" role="menu" aria-label={`Hide options for ${task.title}`}>
                     {HIDE_PRESETS.map(preset => (
                       <button
                         key={preset.minutes}
@@ -321,6 +358,51 @@ export default function TaskRow({
                         {preset.label}
                       </button>
                     ))}
+                    <hr className="hide-menu-divider" />
+                    <button
+                      className="btn btn-sm btn-outline"
+                      onClick={() => {
+                        setShowHideMenu(false);
+                        void onHideUntilDate(task.id, tomorrow);
+                      }}
+                      disabled={isPending}
+                      role="menuitem"
+                    >
+                      Tomorrow
+                    </button>
+                    {!showDatePicker ? (
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => {
+                          setShowDatePicker(true);
+                          setHideDateValue('');
+                        }}
+                        disabled={isPending}
+                        role="menuitem"
+                      >
+                        Pick a date…
+                      </button>
+                    ) : (
+                      <div className="hide-date-picker" role="menuitem">
+                        <input
+                          type="date"
+                          min={minPickerDate}
+                          value={hideDateValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setHideDateValue(val);
+                            if (val) {
+                              setShowHideMenu(false);
+                              setShowDatePicker(false);
+                              void onHideUntilDate(task.id, val);
+                            }
+                          }}
+                          disabled={isPending}
+                          autoFocus
+                          aria-label="Pick a date to hide until"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -519,6 +519,26 @@ textarea:focus-visible,
   white-space: nowrap;
 }
 
+.hide-menu-divider {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 0.125rem 0;
+}
+
+.hide-date-picker {
+  width: 100%;
+}
+
+.hide-date-picker input[type="date"] {
+  width: 100%;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.25rem;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
 /* Task Timestamp */
 .task-timestamp {
   color: var(--text-muted);

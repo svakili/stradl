@@ -44,6 +44,9 @@ export const uncompleteTask = (id: number) =>
 export const hideTask = (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) =>
   request<Task>(`/tasks/${id}/hide`, { method: 'POST', body: JSON.stringify({ durationMinutes }) });
 
+export const hideTaskUntilDate = (id: number, hideUntilDate: string) =>
+  request<Task>(`/tasks/${id}/hide`, { method: 'POST', body: JSON.stringify({ hideUntilDate }) });
+
 export const unhideTask = (id: number) =>
   request<Task>(`/tasks/${id}/unhide`, { method: 'POST' });
 

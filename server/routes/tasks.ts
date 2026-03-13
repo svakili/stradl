@@ -230,12 +230,6 @@ taskRoutes.post('/tasks/:id/hide', (req, res) => {
     return;
   }
 
-  const durationMinutes = Number(req.body?.durationMinutes);
-  if (!Number.isInteger(durationMinutes) || !ALLOWED_HIDE_DURATIONS.has(durationMinutes)) {
-    res.status(400).json({ error: 'durationMinutes must be one of 15, 30, 60, 120, 240' });
-    return;
-  }
-
   const isActivePrioritizedTask = !task.isArchived
     && task.completedAt == null
     && task.priority != null
@@ -247,7 +241,22 @@ taskRoutes.post('/tasks/:id/hide', (req, res) => {
     return;
   }
 
-  task.hiddenUntilAt = new Date(now.getTime() + durationMinutes * 60000).toISOString();
+  const durationMinutes = Number(req.body?.durationMinutes);
+  const hideUntilDate = req.body?.hideUntilDate;
+
+  if (Number.isInteger(durationMinutes) && ALLOWED_HIDE_DURATIONS.has(durationMinutes)) {
+    task.hiddenUntilAt = new Date(now.getTime() + durationMinutes * 60000).toISOString();
+  } else if (typeof hideUntilDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(hideUntilDate)) {
+    const targetDate = new Date(hideUntilDate + 'T00:00:00');
+    if (Number.isNaN(targetDate.getTime()) || targetDate <= now) {
+      res.status(400).json({ error: 'hideUntilDate must be a valid future date (YYYY-MM-DD)' });
+      return;
+    }
+    task.hiddenUntilAt = targetDate.toISOString();
+  } else {
+    res.status(400).json({ error: 'Provide durationMinutes (15|30|60|120|240) or hideUntilDate (YYYY-MM-DD)' });
+    return;
+  }
   clearFocusForTask(data, id);
   writeData(data);
   res.json(task);

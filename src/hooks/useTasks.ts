@@ -53,6 +53,11 @@ export function useTasks(tab: TabName) {
     await reload();
   };
 
+  const hideUntilDate = async (id: number, date: string) => {
+    await api.hideTaskUntilDate(id, date);
+    await reload();
+  };
+
   const unhide = async (id: number) => {
     await api.unhideTask(id);
     await reload();
@@ -73,5 +78,5 @@ export function useTasks(tab: TabName) {
     await reload();
   };
 
-  return { tasks, loading, reload, create, update, complete, uncomplete, hide, unhide, focus, clearFocus, remove };
+  return { tasks, loading, reload, create, update, complete, uncomplete, hide, hideUntilDate, unhide, focus, clearFocus, remove };
 }
