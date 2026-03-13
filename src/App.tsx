@@ -492,7 +492,6 @@ export default function App() {
     } catch (error) {
       const message = `Failed to export tasks: ${getErrorMessage(error)}`;
       showToast(message, 'error');
-      throw new Error(message);
     } finally {
       setIsExportingData(false);
     }

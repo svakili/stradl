@@ -79,7 +79,7 @@ function createMainWindow() {
     title: 'Stradl',
     webPreferences: {
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       preload: path.join(__dirname, 'preload.cjs'),
     },
   });

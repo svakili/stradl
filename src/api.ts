@@ -100,20 +100,26 @@ export const fetchRuntimeInfo = async (): Promise<RuntimeInfo> => {
 };
 
 // Updates
-export const checkForUpdates = () =>
-  getDesktopApi()
-    ? getDesktopApi()!.checkForUpdates()
+export const checkForUpdates = () => {
+  const desktopApi = getDesktopApi();
+  return desktopApi
+    ? desktopApi.checkForUpdates()
     : request<UpdateCheckResult>('/update-check');
+};
 
-export const applyUpdate = () =>
-  getDesktopApi()
-    ? getDesktopApi()!.applyUpdate()
+export const applyUpdate = () => {
+  const desktopApi = getDesktopApi();
+  return desktopApi
+    ? desktopApi.applyUpdate()
     : request<UpdateApplyStartResult>('/update-apply', { method: 'POST' });
+};
 
-export const fetchUpdateApplyStatus = () =>
-  getDesktopApi()
-    ? getDesktopApi()!.getUpdateStatus()
+export const fetchUpdateApplyStatus = () => {
+  const desktopApi = getDesktopApi();
+  return desktopApi
+    ? desktopApi.getUpdateStatus()
     : request<UpdateApplyStatus>('/update-apply-status');
+};
 
 // Data portability
 export const exportData = () =>

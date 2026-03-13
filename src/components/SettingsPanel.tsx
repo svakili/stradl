@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import type {
   Settings,
   RuntimeInfo,
@@ -150,9 +151,12 @@ export default function SettingsPanel({
   };
 
   const isDesktopRuntime = runtimeInfo?.mode === 'desktop-local';
+  const canSelfUpdate = runtimeInfo?.canSelfUpdate === true;
 
   const updateStatus = !isDesktopRuntime
     ? 'Desktop self-update is available in the packaged app.'
+    : !canSelfUpdate
+      ? 'Self-update is unavailable until the packaged app is installed in ~/Applications.'
     : updateCheckResult == null
       ? 'Check for updates to see the latest available release.'
       : updateCheckResult.hasUpdate
@@ -169,7 +173,7 @@ export default function SettingsPanel({
           ? 'Update failed.'
           : null;
 
-  const handleImportSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportSelection = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || isImportingData) return;
 
@@ -259,7 +263,7 @@ export default function SettingsPanel({
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={() => { void onApplyUpdate(); }}
-                  disabled={saving || isApplyingUpdate}
+                  disabled={saving || isApplyingUpdate || !canSelfUpdate}
                 >
                   {isApplyingUpdate ? 'Applying...' : 'Update now'}
                 </button>

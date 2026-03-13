@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readDataFromPaths, resolveStoragePaths } from '../storage.js';
+import { readDataFromPaths, resolveStoragePaths, writeFileAtomically } from '../storage.js';
 
 function makeAppData(title: string) {
   const now = '2026-02-24T00:00:00.000Z';
@@ -106,5 +106,20 @@ describe('storage migration pathing', () => {
 
     const data = readDataFromPaths(paths);
     expect(data.tasks[0].title).toBe('existing-target');
+  });
+});
+
+describe('atomic writes', () => {
+  it('replaces an existing file on win32-compatible paths', () => {
+    const tempRoot = fs.mkdtempSync(path.join(process.cwd(), 'tmp-atomic-write-'));
+    tempRoots.push(tempRoot);
+
+    const filePath = path.join(tempRoot, 'tasks.json');
+    fs.writeFileSync(filePath, JSON.stringify(makeAppData('before'), null, 2));
+
+    writeFileAtomically(filePath, JSON.stringify(makeAppData('after'), null, 2), 'win32');
+
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as ReturnType<typeof makeAppData>;
+    expect(parsed.tasks[0].title).toBe('after');
   });
 });

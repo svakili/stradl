@@ -7,6 +7,11 @@ import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const RUNNING_STATUS_TTL_MS = 60 * 60 * 1000;
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 
 function normalizeVersion(value) {
   return value.trim().replace(/^v/i, '');
@@ -39,6 +44,29 @@ function writeStatusFile(statusPath, status) {
   fs.writeFileSync(statusPath, JSON.stringify(status, null, 2));
 }
 
+function isProcessAlive(pid) {
+  if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return !(error && typeof error === 'object' && error.code === 'ESRCH');
+  }
+}
+
+function coerceTerminalStatus(parsed, message) {
+  return {
+    ...parsed,
+    state: 'failed',
+    step: 'failed',
+    message,
+    finishedAt: new Date().toISOString(),
+  };
+}
+
 function readStatusFile(statusPath) {
   if (!fs.existsSync(statusPath)) {
     return { state: 'idle', step: 'idle' };
@@ -47,9 +75,21 @@ function readStatusFile(statusPath) {
   try {
     const raw = fs.readFileSync(statusPath, 'utf-8');
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
+    if (!isRecord(parsed)) {
       return { state: 'idle', step: 'idle' };
     }
+
+    if (parsed.state === 'running') {
+      const startedAt = typeof parsed.startedAt === 'string' ? Date.parse(parsed.startedAt) : Number.NaN;
+      if (!Number.isNaN(startedAt) && Date.now() - startedAt > RUNNING_STATUS_TTL_MS) {
+        return coerceTerminalStatus(parsed, 'Recovered a stale update state. Please try the update again.');
+      }
+
+      if (typeof parsed.processId === 'number' && !isProcessAlive(parsed.processId)) {
+        return coerceTerminalStatus(parsed, 'Recovered an interrupted update. Please try the update again.');
+      }
+    }
+
     return parsed;
   } catch {
     return { state: 'idle', step: 'idle' };
@@ -226,12 +266,19 @@ export function createDesktopUpdater({
   let updateInFlight = false;
 
   function setStatus(status) {
-    writeStatusFile(statusPath, status);
-    events.emit('status', status);
+    const nextStatus = {
+      ...status,
+      processId: status.state === 'running' ? process.pid : status.processId,
+    };
+    writeStatusFile(statusPath, nextStatus);
+    events.emit('status', nextStatus);
   }
 
   function getStatus() {
     const status = readStatusFile(statusPath);
+    if (status.state === 'failed' && status.finishedAt && status.message?.startsWith('Recovered')) {
+      writeStatusFile(statusPath, status);
+    }
     if (status.state !== 'running') {
       updateInFlight = false;
     }
@@ -389,6 +436,7 @@ export function createDesktopUpdater({
           startedAt,
           finishedAt: new Date().toISOString(),
           fromVersion,
+          processId: process.pid,
         });
         updateInFlight = false;
       }

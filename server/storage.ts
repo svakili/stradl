@@ -151,7 +151,38 @@ function defaultData(): AppData {
   };
 }
 
-function writeFileAtomically(filePath: string, contents: string): void {
+function replaceFile(
+  tempPath: string,
+  filePath: string,
+  platform: NodeJS.Platform = process.platform
+): void {
+  if (platform !== 'win32' || !fs.existsSync(filePath)) {
+    fs.renameSync(tempPath, filePath);
+    return;
+  }
+
+  const backupPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.bak`
+  );
+
+  fs.renameSync(filePath, backupPath);
+  try {
+    fs.renameSync(tempPath, filePath);
+    fs.rmSync(backupPath, { force: true });
+  } catch (error) {
+    if (!fs.existsSync(filePath) && fs.existsSync(backupPath)) {
+      fs.renameSync(backupPath, filePath);
+    }
+    throw error;
+  }
+}
+
+export function writeFileAtomically(
+  filePath: string,
+  contents: string,
+  platform: NodeJS.Platform = process.platform
+): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const tempPath = path.join(
     path.dirname(filePath),
@@ -167,7 +198,7 @@ function writeFileAtomically(filePath: string, contents: string): void {
     fs.closeSync(fileDescriptor);
   }
 
-  fs.renameSync(tempPath, filePath);
+  replaceFile(tempPath, filePath, platform);
 
   try {
     const dirDescriptor = fs.openSync(path.dirname(filePath), 'r');

@@ -21,7 +21,10 @@ function parseArgs(argv) {
 
 function writeStatus(statusPath, status) {
   fs.mkdirSync(path.dirname(statusPath), { recursive: true });
-  fs.writeFileSync(statusPath, JSON.stringify(status, null, 2));
+  fs.writeFileSync(statusPath, JSON.stringify({
+    ...status,
+    processId: status.state === 'running' ? process.pid : status.processId,
+  }, null, 2));
 }
 
 async function waitForProcessExit(pid) {
