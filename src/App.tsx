@@ -68,7 +68,7 @@ export default function App() {
   const vacationNudgeEvaluatedRef = useRef(false);
   const handledUpdateSuccessRef = useRef<string | null>(null);
 
-  const { tasks, loading, reload, create, update, complete, uncomplete, hide, unhide, focus, clearFocus, remove } = useTasks(activeTab);
+  const { tasks, loading, reload, create, update, complete, uncomplete, hide, hideUntilDate, unhide, focus, clearFocus, remove } = useTasks(activeTab);
   const { settings, loading: settingsLoading, reload: reloadSettings, update: updateSettings } = useSettings();
   const { blockers, loadForTask, create: createBlocker, remove: removeBlocker } = useBlockers();
   const {
@@ -284,6 +284,17 @@ export default function App() {
       await hide(id, durationMinutes);
       await loadCounts();
     }, `Task hidden for ${durationLabel}.`, () => {
+      void handleUnhide(id);
+    });
+  };
+
+  const handleHideUntilDate = async (id: number, date: string) => {
+    const dateObj = new Date(date + 'T00:00:00');
+    const label = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    await runTaskAction(id, async () => {
+      await hideUntilDate(id, date);
+      await loadCounts();
+    }, `Task hidden until ${label}.`, () => {
       void handleUnhide(id);
     });
   };
@@ -577,6 +588,7 @@ export default function App() {
         onUpdate={handleUpdate}
         onComplete={handleComplete}
         onHide={handleHide}
+        onHideUntilDate={handleHideUntilDate}
         onUnhide={handleUnhide}
         onFocusToggle={handleFocusToggle}
         onUncomplete={handleUncomplete}

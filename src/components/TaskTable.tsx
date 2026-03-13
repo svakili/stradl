@@ -18,6 +18,7 @@ interface Props {
   onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onHide: (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => Promise<void>;
+  onHideUntilDate: (id: number, date: string) => Promise<void>;
   onUnhide: (id: number) => Promise<void>;
   onFocusToggle: (id: number, options?: { unhideFirst?: boolean }) => Promise<void>;
   onUncomplete: (id: number) => Promise<void>;
@@ -30,7 +31,7 @@ interface Props {
 
 export default function TaskTable({
   tasks, searchQuery, hasActiveSearch, settings, allTasks, blockers, pendingActionByTaskId, activeTab, loading, recentlyUpdatedIds,
-  focusedTaskId, onTabChange, onUpdate, onComplete, onHide, onUnhide, onFocusToggle, onUncomplete,
+  focusedTaskId, onTabChange, onUpdate, onComplete, onHide, onHideUntilDate, onUnhide, onFocusToggle, onUncomplete,
   onLoadBlockers, onAddBlocker, onRemoveBlocker, onPermanentDelete, onClearSearch,
 }: Props) {
   const showStaleness = activeTab === 'tasks';
@@ -131,6 +132,7 @@ export default function TaskTable({
           onUpdate={onUpdate}
           onComplete={onComplete}
           onHide={onHide}
+          onHideUntilDate={onHideUntilDate}
           onUnhide={onUnhide}
           onFocusToggle={onFocusToggle}
           onUncomplete={onUncomplete}
