@@ -3,13 +3,13 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
-  const isDesktopBuild = mode === 'desktop';
+  const isRuntimeBuild = mode === 'runtime' || mode === 'desktop';
 
   return {
     plugins: [
       react(),
       ...(
-        isDesktopBuild
+        isRuntimeBuild
           ? []
           : [
               VitePWA({

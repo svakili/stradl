@@ -3,13 +3,19 @@ import fs from 'fs';
 import path from 'path';
 import type { Request } from 'express';
 import { Router } from 'express';
-import { findProjectRoot, getDataDirectory } from '../storage.js';
+import { createDataSnapshot, findProjectRoot, getDataDirectory } from '../storage.js';
+
+interface GitHubReleaseAsset {
+  name: string;
+  browser_download_url: string;
+}
 
 interface GitHubRelease {
   tag_name: string;
   html_url: string;
   published_at: string;
   name?: string;
+  assets: GitHubReleaseAsset[];
 }
 
 export type UpdateApplyState = 'idle' | 'running' | 'succeeded' | 'failed';
@@ -85,6 +91,17 @@ export function isSelfUpdateEnabled(env: NodeJS.ProcessEnv = process.env): boole
   return env[SELF_UPDATE_FLAG] === 'true';
 }
 
+function getManagedRuntimeRoot(env: NodeJS.ProcessEnv = process.env): string | null {
+  const runtimeRoot = env.STRADL_RUNTIME_ROOT?.trim();
+  return runtimeRoot ? path.resolve(runtimeRoot) : null;
+}
+
+function hasManagedRuntimeInstallation(env: NodeJS.ProcessEnv = process.env): boolean {
+  const runtimeRoot = getManagedRuntimeRoot(env);
+  if (!runtimeRoot) return false;
+  return fs.existsSync(path.join(runtimeRoot, 'current', 'server', 'dist', 'index.js'));
+}
+
 export function isLoopbackAddress(address: string | undefined | null): boolean {
   if (!address) return false;
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
@@ -92,14 +109,6 @@ export function isLoopbackAddress(address: string | undefined | null): boolean {
 
 function isLocalRequest(req: Request): boolean {
   return isLoopbackAddress(req.ip) || isLoopbackAddress(req.socket.remoteAddress);
-}
-
-function runCapture(command: string, cwd: string): string {
-  return childProcess.execSync(command, {
-    cwd,
-    encoding: 'utf-8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
 }
 
 function getLaunchAgentPath(): string {
@@ -115,25 +124,20 @@ function ensureLaunchAgentInstalled(): void {
   if (!fs.existsSync(launchAgentPath)) {
     throw new HttpError(
       400,
-      `LaunchAgent is not installed (${launchAgentPath}). Run npm run install-service first.`
+      `LaunchAgent is not installed (${launchAgentPath}). Run the Stradl installer to configure auto-start.`
     );
   }
 }
 
-function ensureCleanWorkingTree(projectRoot: string): void {
-  let statusOutput: string;
-  try {
-    statusOutput = runCapture('git status --porcelain', projectRoot);
-  } catch {
-    throw new HttpError(500, 'Failed to inspect git working tree.');
-  }
-
-  if (statusOutput) {
+function ensureManagedRuntimeInstalled(): string {
+  const runtimeRoot = getManagedRuntimeRoot();
+  if (!runtimeRoot || !hasManagedRuntimeInstallation()) {
     throw new HttpError(
-      409,
-      'Update blocked: working tree has local changes. Commit or stash changes before updating.'
+      400,
+      'Managed runtime is not installed. Install Stradl from the runtime release before using self-update.'
     );
   }
+  return runtimeRoot;
 }
 
 function getUpdateStatusPath(): string {
@@ -187,10 +191,80 @@ function readUpdateApplyStatus(): UpdateApplyStatus {
   }
 }
 
+function getGitHubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'stradl-update-checker',
+  };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  return headers;
+}
+
+async function fetchLatestRelease(): Promise<GitHubRelease> {
+  const owner = process.env.STRADL_UPDATE_OWNER || 'svakili';
+  const repo = process.env.STRADL_UPDATE_REPO || 'stradl';
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+
+  let releaseRes: Response;
+  try {
+    releaseRes = await fetch(url, { headers: getGitHubHeaders() });
+  } catch {
+    throw new HttpError(502, 'Failed to reach GitHub release API.');
+  }
+
+  if (!releaseRes.ok) {
+    throw new HttpError(502, `Failed to check updates (GitHub ${releaseRes.status}).`);
+  }
+
+  let release: Partial<GitHubRelease>;
+  try {
+    release = (await releaseRes.json()) as Partial<GitHubRelease>;
+  } catch {
+    throw new HttpError(502, 'Failed to parse GitHub release response.');
+  }
+
+  if (
+    typeof release.tag_name !== 'string' ||
+    typeof release.html_url !== 'string' ||
+    typeof release.published_at !== 'string' ||
+    !Array.isArray(release.assets)
+  ) {
+    throw new HttpError(502, 'GitHub release response missing required fields.');
+  }
+
+  return {
+    tag_name: release.tag_name,
+    html_url: release.html_url,
+    published_at: release.published_at,
+    name: typeof release.name === 'string' ? release.name : undefined,
+    assets: release.assets
+      .filter((asset): asset is GitHubReleaseAsset =>
+        Boolean(
+          asset &&
+          typeof asset === 'object' &&
+          typeof asset.name === 'string' &&
+          typeof asset.browser_download_url === 'string'
+        )
+      ),
+  };
+}
+
+function findAsset(release: GitHubRelease, assetName: string): GitHubReleaseAsset | undefined {
+  return release.assets.find((asset) => asset.name === assetName);
+}
+
 function spawnSelfUpdateProcess(args: {
   operationId: string;
   startedAt: string;
   fromVersion: string;
+  targetVersion: string;
+  archiveUrl: string;
+  checksumUrl: string;
+  runtimeRoot: string;
 }): void {
   const statusPath = getUpdateStatusPath();
   const scriptPath = path.join(PROJECT_ROOT, 'scripts', 'self-update.js');
@@ -207,6 +281,11 @@ function spawnSelfUpdateProcess(args: {
       '--operation-id', args.operationId,
       '--started-at', args.startedAt,
       '--from-version', args.fromVersion,
+      '--target-version', args.targetVersion,
+      '--archive-url', args.archiveUrl,
+      '--checksum-url', args.checksumUrl,
+      '--runtime-root', args.runtimeRoot,
+      '--data-dir', getDataDirectory(),
     ],
     {
       cwd: PROJECT_ROOT,
@@ -219,6 +298,18 @@ function spawnSelfUpdateProcess(args: {
 
 export const updateRoutes = Router();
 
+updateRoutes.get('/runtime-info', (_req, res) => {
+  try {
+    res.json({
+      mode: 'web',
+      appVersion: readCurrentVersion(),
+      canSelfUpdate: isSelfUpdateEnabled() && hasManagedRuntimeInstallation(),
+    });
+  } catch {
+    res.status(500).send('Failed to read local runtime info.');
+  }
+});
+
 updateRoutes.get('/update-check', async (_req, res) => {
   const checkedAt = new Date().toISOString();
 
@@ -230,46 +321,16 @@ updateRoutes.get('/update-check', async (_req, res) => {
     return;
   }
 
-  const owner = process.env.STRADL_UPDATE_OWNER || 'svakili';
-  const repo = process.env.STRADL_UPDATE_REPO || 'stradl';
-  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
-
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'stradl-update-checker',
-  };
-
-  if (process.env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  }
-
-  let releaseRes: Response;
+  let release: GitHubRelease;
   try {
-    releaseRes = await fetch(url, { headers });
-  } catch {
-    res.status(502).send('Failed to reach GitHub release API.');
-    return;
-  }
-
-  if (!releaseRes.ok) {
-    res.status(502).send(`Failed to check updates (GitHub ${releaseRes.status}).`);
-    return;
-  }
-
-  let release: Partial<GitHubRelease>;
-  try {
-    release = (await releaseRes.json()) as Partial<GitHubRelease>;
-  } catch {
-    res.status(502).send('Failed to parse GitHub release response.');
-    return;
-  }
-
-  if (
-    typeof release.tag_name !== 'string' ||
-    typeof release.html_url !== 'string' ||
-    typeof release.published_at !== 'string'
-  ) {
-    res.status(502).send('GitHub release response missing required fields.');
+    release = await fetchLatestRelease();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to check for updates.';
+    if (error instanceof HttpError) {
+      res.status(error.status).send(message);
+      return;
+    }
+    res.status(502).send(message);
     return;
   }
 
@@ -294,7 +355,7 @@ updateRoutes.get('/update-check', async (_req, res) => {
   });
 });
 
-updateRoutes.post('/update-apply', (req, res) => {
+updateRoutes.post('/update-apply', async (req, res) => {
   let statusInitialized = false;
   try {
     if (!isSelfUpdateEnabled()) {
@@ -311,7 +372,7 @@ updateRoutes.post('/update-apply', (req, res) => {
     }
 
     ensureLaunchAgentInstalled();
-    ensureCleanWorkingTree(PROJECT_ROOT);
+    const runtimeRoot = ensureManagedRuntimeInstalled();
 
     let fromVersion: string;
     try {
@@ -320,22 +381,59 @@ updateRoutes.post('/update-apply', (req, res) => {
       throw new HttpError(500, 'Failed to read local app version.');
     }
 
+    const release = await fetchLatestRelease();
+    const latestVersion = normalizeVersion(release.tag_name);
+    let hasUpdate: boolean;
+    try {
+      hasUpdate = isVersionNewer(latestVersion, fromVersion);
+    } catch {
+      throw new HttpError(502, 'GitHub release version format is invalid.');
+    }
+
+    if (!hasUpdate) {
+      throw new HttpError(409, `Already up to date (v${fromVersion}).`);
+    }
+
+    const runtimeAsset = findAsset(release, `Stradl-runtime-v${latestVersion}.tar.gz`);
+    if (!runtimeAsset) {
+      throw new HttpError(502, `GitHub release is missing Stradl-runtime-v${latestVersion}.tar.gz.`);
+    }
+
+    const checksumAsset = findAsset(release, 'SHA256SUMS.txt');
+    if (!checksumAsset) {
+      throw new HttpError(502, 'GitHub release is missing SHA256SUMS.txt.');
+    }
+
+    const snapshot = createDataSnapshot('pre-update');
     const operationId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const startedAt = new Date().toISOString();
     writeUpdateApplyStatus({
       state: 'running',
       step: 'queued',
-      message: 'Update queued.',
+      message: `Update queued. Snapshot saved to ${snapshot.snapshotPath}.`,
       operationId,
       startedAt,
       fromVersion,
+      toVersion: latestVersion,
     });
     statusInitialized = true;
 
-    spawnSelfUpdateProcess({ operationId, startedAt, fromVersion });
+    spawnSelfUpdateProcess({
+      operationId,
+      startedAt,
+      fromVersion,
+      targetVersion: latestVersion,
+      archiveUrl: runtimeAsset.browser_download_url,
+      checksumUrl: checksumAsset.browser_download_url,
+      runtimeRoot,
+    });
     updateInFlight = true;
 
-    const payload: UpdateApplyStartResponse = { operationId, startedAt };
+    const payload: UpdateApplyStartResponse = {
+      operationId,
+      startedAt,
+      targetVersion: latestVersion,
+    };
     res.status(202).json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to start update.';

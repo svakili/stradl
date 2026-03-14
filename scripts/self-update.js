@@ -1,60 +1,15 @@
 #!/usr/bin/env node
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-
-function parseArgs(argv) {
-  const parsed = {};
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-    if (!token.startsWith('--')) continue;
-    const key = token.slice(2);
-    const value = argv[i + 1];
-    if (!value || value.startsWith('--')) {
-      parsed[key] = 'true';
-      continue;
-    }
-    parsed[key] = value;
-    i += 1;
-  }
-  return parsed;
-}
-
-function formatCommandError(error) {
-  if (!error || typeof error !== 'object') {
-    return 'Command failed.';
-  }
-
-  const maybeError = error;
-  const stderr = typeof maybeError.stderr === 'string'
-    ? maybeError.stderr.trim()
-    : Buffer.isBuffer(maybeError.stderr)
-      ? maybeError.stderr.toString('utf-8').trim()
-      : '';
-  if (stderr) return stderr;
-
-  const stdout = typeof maybeError.stdout === 'string'
-    ? maybeError.stdout.trim()
-    : Buffer.isBuffer(maybeError.stdout)
-      ? maybeError.stdout.toString('utf-8').trim()
-      : '';
-  if (stdout) return stdout;
-
-  if (maybeError instanceof Error && maybeError.message) {
-    return maybeError.message;
-  }
-  return 'Command failed.';
-}
-
-function readLocalVersion(projectRoot) {
-  const packagePath = path.join(projectRoot, 'package.json');
-  const raw = fs.readFileSync(packagePath, 'utf-8');
-  const parsed = JSON.parse(raw);
-  if (!parsed.version || typeof parsed.version !== 'string') {
-    throw new Error('App version missing.');
-  }
-  return parsed.version.replace(/^v/i, '').trim();
-}
+import {
+  formatCommandError,
+  getRuntimeArchiveName,
+  getRuntimePaths,
+  LAUNCH_AGENT_LABEL,
+  parseArgs,
+} from './runtime-support.js';
 
 function runCommand(command, cwd) {
   try {
@@ -68,25 +23,92 @@ function runCommand(command, cwd) {
   }
 }
 
+async function downloadFile(url, destinationPath) {
+  const headers = {
+    Accept: 'application/octet-stream',
+    'User-Agent': 'stradl-runtime-updater',
+  };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status}) for ${url}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(destinationPath, buffer);
+}
+
+function sha256File(filePath) {
+  const hash = crypto.createHash('sha256');
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest('hex');
+}
+
+function readExpectedChecksum(filePath, artifactName) {
+  const lines = fs.readFileSync(filePath, 'utf-8').split(/\r?\n/);
+  for (const line of lines) {
+    const match = line.match(/^([a-f0-9]{64})\s+(.+)$/i);
+    if (!match) continue;
+    if (match[2] === artifactName) {
+      return match[1].toLowerCase();
+    }
+  }
+
+  throw new Error(`Checksum entry missing for ${artifactName}.`);
+}
+
+function replaceSymlink(targetPath, linkPath) {
+  const tempPath = `${linkPath}.tmp-${process.pid}-${Date.now()}`;
+  fs.rmSync(tempPath, { force: true, recursive: true });
+  fs.symlinkSync(targetPath, tempPath);
+  fs.renameSync(tempPath, linkPath);
+}
+
+function detectExtractedRuntimeDirectory(extractRoot) {
+  const children = fs.readdirSync(extractRoot, { withFileTypes: true });
+  const directory = children.find((entry) => entry.isDirectory());
+  if (!directory) {
+    throw new Error('Runtime archive did not contain a top-level directory.');
+  }
+  return path.join(extractRoot, directory.name);
+}
+
 const args = parseArgs(process.argv.slice(2));
 const statusFile = args['status-file'];
 const operationId = args['operation-id'];
 const startedAt = args['started-at'] || new Date().toISOString();
-const projectRoot = process.cwd();
+const fromVersion = typeof args['from-version'] === 'string' ? args['from-version'] : undefined;
+const targetVersion = typeof args['target-version'] === 'string' ? args['target-version'] : undefined;
+const archiveUrl = typeof args['archive-url'] === 'string' ? args['archive-url'] : undefined;
+const checksumUrl = typeof args['checksum-url'] === 'string' ? args['checksum-url'] : undefined;
+const runtimeRoot = typeof args['runtime-root'] === 'string'
+  ? args['runtime-root']
+  : process.env.STRADL_RUNTIME_ROOT;
+const dataDir = typeof args['data-dir'] === 'string' ? args['data-dir'] : undefined;
 
-if (!statusFile || !operationId) {
-  console.error('Usage: node scripts/self-update.js --status-file <path> --operation-id <id> [--started-at <iso>] [--from-version <ver>]');
+if (!statusFile || !operationId || !targetVersion || !archiveUrl || !checksumUrl || !runtimeRoot) {
+  console.error(
+    'Usage: node scripts/self-update.js --status-file <path> --operation-id <id> --target-version <ver> --archive-url <url> --checksum-url <url> --runtime-root <path> [--data-dir <path>] [--started-at <iso>] [--from-version <ver>]'
+  );
   process.exit(1);
 }
+
+const runtimePaths = getRuntimePaths({ dataDir, runtimeRoot });
+const artifactName = getRuntimeArchiveName(targetVersion);
+const downloadDir = path.join(runtimePaths.downloadsDir, targetVersion);
 
 const state = {
   state: 'running',
   step: 'starting',
   operationId,
   startedAt,
-  fromVersion: typeof args['from-version'] === 'string' ? args['from-version'] : undefined,
-  toVersion: undefined,
-  message: 'Starting self-update.',
+  fromVersion,
+  toVersion: targetVersion,
+  message: 'Starting update.',
   finishedAt: undefined,
 };
 
@@ -104,38 +126,55 @@ function setStep(step, message) {
 
 function markFailed(message) {
   state.state = 'failed';
+  state.step = state.step === 'starting' ? 'failed' : state.step;
   state.message = message;
   state.finishedAt = new Date().toISOString();
   writeStatus();
 }
 
-function markSucceeded() {
+function markSucceeded(message) {
   state.state = 'succeeded';
   state.step = 'completed';
-  state.message = 'Update applied successfully.';
+  state.message = message;
   state.finishedAt = new Date().toISOString();
   writeStatus();
 }
 
 try {
-  if (!state.fromVersion) {
-    state.fromVersion = readLocalVersion(projectRoot);
-  }
   writeStatus();
 
-  setStep('fetching', 'Fetching latest origin/main.');
-  runCommand('git fetch origin main', projectRoot);
+  fs.mkdirSync(downloadDir, { recursive: true });
+  fs.mkdirSync(runtimePaths.versionsDir, { recursive: true });
 
-  setStep('pulling', 'Pulling latest origin/main.');
-  runCommand('git pull --ff-only origin main', projectRoot);
+  const archivePath = path.join(downloadDir, artifactName);
+  const checksumsPath = path.join(downloadDir, 'SHA256SUMS.txt');
 
-  setStep('installing-dependencies', 'Installing dependencies.');
-  runCommand('npm ci --include=dev', projectRoot);
+  setStep('downloading', `Downloading ${artifactName}.`);
+  await downloadFile(archiveUrl, archivePath);
+  await downloadFile(checksumUrl, checksumsPath);
 
-  setStep('building', 'Building application.');
-  runCommand('npm run build', projectRoot);
+  setStep('verifying', 'Verifying downloaded runtime.');
+  const expectedChecksum = readExpectedChecksum(checksumsPath, artifactName);
+  const actualChecksum = sha256File(archivePath);
+  if (actualChecksum !== expectedChecksum) {
+    throw new Error(`Checksum mismatch for ${artifactName}.`);
+  }
 
-  state.toVersion = readLocalVersion(projectRoot);
+  const extractRoot = path.join(runtimePaths.versionsDir, `.tmp-${targetVersion}-${Date.now()}`);
+  fs.mkdirSync(extractRoot, { recursive: true });
+
+  setStep('extracting', 'Extracting runtime.');
+  runCommand(`tar -xzf "${archivePath}" -C "${extractRoot}"`, runtimePaths.dataDir);
+
+  const extractedRuntimeDir = detectExtractedRuntimeDirectory(extractRoot);
+  const finalRuntimeDir = path.join(runtimePaths.versionsDir, path.basename(extractedRuntimeDir));
+  if (!fs.existsSync(finalRuntimeDir)) {
+    fs.renameSync(extractedRuntimeDir, finalRuntimeDir);
+  }
+  fs.rmSync(extractRoot, { recursive: true, force: true });
+
+  setStep('switching-runtime', 'Switching to the new runtime.');
+  replaceSymlink(finalRuntimeDir, runtimePaths.currentLink);
 
   const uid = typeof process.getuid === 'function'
     ? String(process.getuid())
@@ -144,10 +183,10 @@ try {
     throw new Error('Unable to determine user id for launchctl.');
   }
 
-  setStep('restarting', 'Restarting LaunchAgent service.');
-  runCommand(`launchctl kickstart -k gui/${uid}/com.stradl.server`, projectRoot);
+  setStep('restarting', 'Restarting the Stradl service.');
+  runCommand(`launchctl kickstart -k gui/${uid}/${LAUNCH_AGENT_LABEL}`, runtimePaths.dataDir);
 
-  markSucceeded();
+  markSucceeded(`Updated to v${targetVersion}.`);
 } catch (error) {
   const message = error instanceof Error ? error.message : 'Self-update failed.';
   markFailed(message);

@@ -5,16 +5,15 @@ import path from 'path';
 import { updateRoutes } from '../routes/update.js';
 
 vi.mock('child_process', () => ({
-  execSync: vi.fn(() => ''),
   spawn: vi.fn(() => ({ unref: vi.fn() })),
 }));
 
 function findHandler(method: string, routePath: string) {
-  const layer = (updateRoutes as any).stack.find((s: any) =>
-    s.route?.path === routePath && s.route?.methods[method]
+  const layer = (updateRoutes as any).stack.find((entry: any) =>
+    entry.route?.path === routePath && entry.route?.methods[method]
   );
   if (!layer) throw new Error(`No handler for ${method.toUpperCase()} ${routePath}`);
-  return layer.route.stack.find((s: any) => s.method === method).handle;
+  return layer.route.stack.find((entry: any) => entry.method === method).handle;
 }
 
 function mockReq(overrides: Record<string, unknown> = {}) {
@@ -37,9 +36,74 @@ function mockRes() {
   return res;
 }
 
+function buildRelease(version: string, overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    tag_name: `v${version}`,
+    html_url: `https://github.com/svakili/stradl/releases/tag/v${version}`,
+    published_at: '2026-02-01T00:00:00.000Z',
+    name: `v${version}`,
+    assets: [
+      {
+        name: `Stradl-runtime-v${version}.tar.gz`,
+        browser_download_url: `https://example.com/Stradl-runtime-v${version}.tar.gz`,
+      },
+      {
+        name: 'SHA256SUMS.txt',
+        browser_download_url: 'https://example.com/SHA256SUMS.txt',
+      },
+    ],
+    ...overrides,
+  };
+}
+
 const currentVersion = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8')
 ) as { version: string };
+
+describe('GET /runtime-info', () => {
+  const handler = findHandler('get', '/runtime-info');
+  const originalEnv = { ...process.env };
+  let tempRoot = '';
+
+  beforeEach(() => {
+    tempRoot = fs.mkdtempSync(path.join(process.cwd(), 'tmp-runtime-info-'));
+    process.env = {
+      ...originalEnv,
+      HOME: tempRoot,
+      STRADL_DATA_DIR: path.join(tempRoot, 'data'),
+    };
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('returns canSelfUpdate=false outside the managed runtime', () => {
+    const res = mockRes();
+    handler(mockReq(), res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.mode).toBe('web');
+    expect(payload.appVersion).toBe(currentVersion.version);
+    expect(payload.canSelfUpdate).toBe(false);
+  });
+
+  it('returns canSelfUpdate=true for the installed local runtime', () => {
+    const runtimeRoot = path.join(tempRoot, 'data', 'runtime');
+    const entryPath = path.join(runtimeRoot, 'current', 'server', 'dist', 'index.js');
+    fs.mkdirSync(path.dirname(entryPath), { recursive: true });
+    fs.writeFileSync(entryPath, '');
+    process.env.STRADL_ENABLE_SELF_UPDATE = 'true';
+    process.env.STRADL_RUNTIME_ROOT = runtimeRoot;
+
+    const res = mockRes();
+    handler(mockReq(), res);
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.canSelfUpdate).toBe(true);
+  });
+});
 
 describe('GET /update-check', () => {
   const handler = findHandler('get', '/update-check');
@@ -60,12 +124,7 @@ describe('GET /update-check', () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      json: vi.fn().mockResolvedValue({
-        tag_name: 'v999.0.0',
-        html_url: 'https://github.com/svakili/stradl/releases/tag/v999.0.0',
-        published_at: '2026-02-01T00:00:00.000Z',
-        name: 'v999.0.0',
-      }),
+      json: vi.fn().mockResolvedValue(buildRelease('999.0.0')),
     } as any);
 
     const res = mockRes();
@@ -80,12 +139,7 @@ describe('GET /update-check', () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      json: vi.fn().mockResolvedValue({
-        tag_name: `v${currentVersion.version}`,
-        html_url: `https://github.com/svakili/stradl/releases/tag/v${currentVersion.version}`,
-        published_at: '2026-02-01T00:00:00.000Z',
-        name: `v${currentVersion.version}`,
-      }),
+      json: vi.fn().mockResolvedValue(buildRelease(currentVersion.version)),
     } as any);
 
     const res = mockRes();
@@ -101,12 +155,7 @@ describe('GET /update-check', () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      json: vi.fn().mockResolvedValue({
-        tag_name: 'v1.2.3',
-        html_url: 'https://github.com/svakili/stradl/releases/tag/v1.2.3',
-        published_at: '2026-02-01T00:00:00.000Z',
-        name: 'v1.2.3',
-      }),
+      json: vi.fn().mockResolvedValue(buildRelease('1.2.3')),
     } as any);
 
     const res = mockRes();
@@ -134,12 +183,9 @@ describe('GET /update-check', () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      json: vi.fn().mockResolvedValue({
-        tag_name: 'v9.9.9',
-        html_url: 'https://github.com/svakili/stradl/releases/tag/v9.9.9',
+      json: vi.fn().mockResolvedValue(buildRelease('9.9.9', {
         published_at: '2026-02-10T12:00:00.000Z',
-        name: 'v9.9.9',
-      }),
+      })),
     } as any);
 
     const res = mockRes();
@@ -159,25 +205,36 @@ describe('POST /update-apply', () => {
   const originalEnv = { ...process.env };
   let tempRoot = '';
   let launchAgentPath = '';
+  let runtimeRoot = '';
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
+
     tempRoot = fs.mkdtempSync(path.join(process.cwd(), 'tmp-update-routes-'));
     launchAgentPath = path.join(tempRoot, 'Library', 'LaunchAgents', 'com.stradl.server.plist');
+    runtimeRoot = path.join(tempRoot, 'data', 'runtime');
+
     fs.mkdirSync(path.dirname(launchAgentPath), { recursive: true });
     fs.writeFileSync(launchAgentPath, '');
+
+    const runtimeEntry = path.join(runtimeRoot, 'current', 'server', 'dist', 'index.js');
+    fs.mkdirSync(path.dirname(runtimeEntry), { recursive: true });
+    fs.writeFileSync(runtimeEntry, '');
 
     process.env = {
       ...originalEnv,
       HOME: tempRoot,
       STRADL_DATA_DIR: path.join(tempRoot, 'data'),
       STRADL_ENABLE_SELF_UPDATE: 'true',
+      STRADL_RUNTIME_ROOT: runtimeRoot,
     };
 
-    vi.mocked(childProcess.execSync).mockImplementation(((command: string) => {
-      if (command === 'git status --porcelain') return '';
-      return '';
-    }) as typeof childProcess.execSync);
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(buildRelease('999.0.0')),
+    } as any);
     vi.mocked(childProcess.spawn).mockReturnValue({
       unref: vi.fn(),
     } as unknown as ReturnType<typeof childProcess.spawn>);
@@ -185,72 +242,113 @@ describe('POST /update-apply', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     process.env = { ...originalEnv };
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('returns 403 when self-update is disabled', () => {
+  it('returns 403 when self-update is disabled', async () => {
     delete process.env.STRADL_ENABLE_SELF_UPDATE;
     const res = mockRes();
 
-    handler(mockLocalReq(), res);
+    await handler(mockLocalReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.send).toHaveBeenCalledWith('Self-update is disabled. Set STRADL_ENABLE_SELF_UPDATE=true to enable.');
   });
 
-  it('returns 409 when working tree is dirty', () => {
-    vi.mocked(childProcess.execSync).mockImplementation(((command: string) => {
-      if (command === 'git status --porcelain') return ' M src/App.tsx';
-      return '';
-    }) as typeof childProcess.execSync);
-
+  it('returns 400 when managed runtime is missing', async () => {
+    fs.rmSync(runtimeRoot, { recursive: true, force: true });
     const res = mockRes();
-    handler(mockLocalReq(), res);
 
-    expect(res.status).toHaveBeenCalledWith(409);
+    await handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send).toHaveBeenCalledWith(
-      'Update blocked: working tree has local changes. Commit or stash changes before updating.'
+      'Managed runtime is not installed. Install Stradl from the runtime release before using self-update.'
     );
   });
 
-  it('returns 400 when LaunchAgent is missing', () => {
+  it('returns 400 when LaunchAgent is missing', async () => {
     fs.unlinkSync(launchAgentPath);
     const res = mockRes();
 
-    handler(mockLocalReq(), res);
+    await handler(mockLocalReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.send.mock.calls[0][0]).toContain('LaunchAgent is not installed');
   });
 
-  it('returns 409 when update is already running', () => {
+  it('returns 409 when update is already running', async () => {
     const statusFile = path.join(process.env.STRADL_DATA_DIR!, 'update-status.json');
     fs.mkdirSync(path.dirname(statusFile), { recursive: true });
-    fs.writeFileSync(statusFile, JSON.stringify({ state: 'running', step: 'building' }, null, 2));
+    fs.writeFileSync(statusFile, JSON.stringify({ state: 'running', step: 'downloading' }, null, 2));
 
     const res = mockRes();
-    handler(mockLocalReq(), res);
+    await handler(mockLocalReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.send).toHaveBeenCalledWith('An update is already running.');
   });
 
-  it('starts update and returns operation metadata', () => {
+  it('returns 409 when already up to date', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(buildRelease(currentVersion.version)),
+    } as any);
+
     const res = mockRes();
-    handler(mockLocalReq(), res);
+    await handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.send).toHaveBeenCalledWith(`Already up to date (v${currentVersion.version}).`);
+  });
+
+  it('returns 502 when the runtime asset is missing', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(buildRelease('999.0.0', {
+        assets: [{ name: 'SHA256SUMS.txt', browser_download_url: 'https://example.com/SHA256SUMS.txt' }],
+      })),
+    } as any);
+
+    const res = mockRes();
+    await handler(mockLocalReq(), res);
+
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(res.send).toHaveBeenCalledWith('GitHub release is missing Stradl-runtime-v999.0.0.tar.gz.');
+  });
+
+  it('starts update, creates a snapshot, and returns operation metadata', async () => {
+    const res = mockRes();
+    await handler(mockLocalReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(202);
     const payload = res.json.mock.calls[0][0];
+    expect(payload.targetVersion).toBe('999.0.0');
     expect(typeof payload.operationId).toBe('string');
     expect(typeof payload.startedAt).toBe('string');
     expect(vi.mocked(childProcess.spawn)).toHaveBeenCalledTimes(1);
+
+    const spawnedArgs = vi.mocked(childProcess.spawn).mock.calls[0][1] as string[];
+    expect(spawnedArgs).toContain('--target-version');
+    expect(spawnedArgs).toContain('999.0.0');
+    expect(spawnedArgs).toContain('--runtime-root');
+    expect(spawnedArgs).toContain(runtimeRoot);
 
     const statusRes = mockRes();
     statusHandler(mockLocalReq(), statusRes);
     const statusPayload = statusRes.json.mock.calls[0][0];
     expect(statusPayload.state).toBe('running');
     expect(statusPayload.step).toBe('queued');
+    expect(statusPayload.toVersion).toBe('999.0.0');
+    expect(statusPayload.message).toContain('Snapshot saved to');
+
+    const backupsDir = path.join(process.env.STRADL_DATA_DIR!, 'backups');
+    const backupFiles = fs.readdirSync(backupsDir);
+    expect(backupFiles.length).toBe(1);
   });
 
   it('reads terminal status from status file', () => {

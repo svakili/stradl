@@ -57,13 +57,13 @@ if (dirty) {
 run('git fetch origin main');
 run('git pull --ff-only origin main');
 run(`npm version ${bump}`);
-run('npm run package:desktop');
+run('npm run package:runtime');
 
 const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 const version = pkg.version;
 const tag = `v${version}`;
 
 run('git push origin main --follow-tags');
-run(`gh release create ${tag} release/Stradl-mac-*.zip release/SHA256SUMS.txt --generate-notes`);
+run(`gh release create ${tag} release/Stradl-runtime-v*.tar.gz release/install-stradl.sh release/SHA256SUMS.txt --generate-notes`);
 
 console.log(`\nRelease complete: ${tag}`);

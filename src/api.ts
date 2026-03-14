@@ -92,11 +92,7 @@ export const fetchRuntimeInfo = async (): Promise<RuntimeInfo> => {
     return desktopApi.getRuntimeInfo();
   }
 
-  return {
-    mode: 'web',
-    appVersion: 'web',
-    canSelfUpdate: false,
-  };
+  return request<RuntimeInfo>('/runtime-info');
 };
 
 // Updates

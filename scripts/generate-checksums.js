@@ -15,16 +15,16 @@ if (!fs.existsSync(outputDir)) {
   process.exit(1);
 }
 
-const zipFiles = fs.readdirSync(outputDir)
-  .filter((name) => name.endsWith('.zip'))
+const artifactFiles = fs.readdirSync(outputDir)
+  .filter((name) => name.endsWith('.zip') || name.endsWith('.tar.gz'))
   .sort();
 
-if (zipFiles.length === 0) {
-  console.error(`No zip artifacts found in ${outputDir}`);
+if (artifactFiles.length === 0) {
+  console.error(`No release artifacts found in ${outputDir}`);
   process.exit(1);
 }
 
-const lines = zipFiles.map((fileName) => {
+const lines = artifactFiles.map((fileName) => {
   const hash = crypto.createHash('sha256');
   hash.update(fs.readFileSync(path.join(outputDir, fileName)));
   return `${hash.digest('hex')}  ${fileName}`;

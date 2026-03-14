@@ -3,7 +3,7 @@
 [![CI](https://github.com/svakili/stradl/actions/workflows/ci.yml/badge.svg)](https://github.com/svakili/stradl/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-A single-user local task management app for multitasking. Tracks tasks with priorities (P0/P1/P2/Ideas), free-text statuses, blocking relationships, and staleness indicators. The same React UI can run as a browser/PWA build or as a packaged macOS desktop app with one-click updates.
+A single-user local task management app for multitasking. Tracks tasks with priorities (P0/P1/P2/Ideas), free-text statuses, blocking relationships, and staleness indicators. The same React UI can run as a browser/PWA build or as a managed local runtime on macOS with one-click updates.
 
 > Project status: early-stage. Current contribution scope is intentionally narrow to docs and small fixes. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
@@ -23,8 +23,8 @@ This starts the Express API server on port 3001 and the Vite dev server on port 
 ## Platform Support
 
 - Development workflow: cross-platform (macOS, Linux, Windows with Node 18+)
-- Packaged desktop runtime: macOS-only
-- Legacy LaunchAgent/runtime extras: macOS-only
+- Managed local runtime installer: macOS-only
+- Repo-based LaunchAgent mode: macOS-only
 
 ## Production
 
@@ -35,27 +35,34 @@ npm start
 
 Builds the frontend and compiles the server TypeScript, then serves everything from http://localhost:3001.
 
-## Desktop App (macOS)
+## Managed Runtime Installer (macOS)
 
-Build a packaged desktop app:
+Build the release artifacts:
 
 ```bash
-npm run package:desktop
+npm run package:runtime
 ```
 
 This produces:
 
-- `release/Stradl-mac-arm64-v<version>.zip`
+- `release/Stradl-runtime-v<version>.tar.gz`
+- `release/install-stradl.sh`
 - `release/SHA256SUMS.txt`
 
-Install the app by unzipping it and moving `Stradl.app` into `~/Applications`.
+Install from the release assets with:
 
-Desktop runtime notes:
+```bash
+bash install-stradl.sh
+```
 
-- packaged desktop builds disable the PWA/service worker layer
-- the Electron shell starts the same local Express API on a loopback port
-- desktop self-update is only enabled for packaged apps installed in `~/Applications`
-- update artifacts are downloaded from GitHub Releases and verified against `SHA256SUMS.txt`
+Installer/runtime notes:
+
+- target machine must already have Node.js 18+ available on `PATH`
+- runtime builds disable the PWA/service worker layer
+- the installer places the managed runtime at `~/Library/Application Support/Stradl/runtime/current`
+- the installer configures a macOS LaunchAgent so Stradl starts on login
+- the installer opens Stradl in the default browser at `http://127.0.0.1:3001`
+- in-app updates download the next runtime tarball from GitHub Releases and verify it against `SHA256SUMS.txt`
 
 ## Moving Tasks Safely
 
@@ -72,7 +79,7 @@ Automatic backups are written to:
 
 `~/Library/Application Support/Stradl/backups/`
 
-During desktop updates, Stradl creates a `pre-update` snapshot before replacing the app bundle.
+During managed runtime updates, Stradl creates a `pre-update` snapshot before switching the active runtime.
 
 ## Releasing
 
@@ -80,9 +87,9 @@ This project includes one-command release scripts that:
 - ensure you are on a clean `main` branch
 - pull latest `origin/main`
 - bump version + create tag via `npm version`
-- build the packaged desktop zip and `SHA256SUMS.txt`
+- build the managed runtime tarball, installer script, and `SHA256SUMS.txt`
 - push commit and tag
-- create a GitHub release with generated notes and upload the desktop artifacts
+- create a GitHub release with generated notes and upload the runtime artifacts
 
 Use one of:
 
@@ -95,12 +102,12 @@ npm run release:major
 Notes:
 - Requires `gh` authenticated (`gh auth status`)
 - Release tags are `v<version>` and match `package.json` version
-- Releases upload `release/Stradl-mac-*.zip` and `release/SHA256SUMS.txt`
+- Releases upload `release/Stradl-runtime-v*.tar.gz`, `release/install-stradl.sh`, and `release/SHA256SUMS.txt`
 - Intended for maintainers
 
-## Legacy LaunchAgent Mode (macOS-only)
+## Repo-Based LaunchAgent Mode (macOS-only)
 
-This mode keeps the old `http://localhost:3001` server running outside the packaged desktop app. It is still available for repo-based installs, but the packaged Electron app is now the primary runtime for one-click updates.
+This mode keeps the old `http://localhost:3001` server running directly from a repo checkout. It is still useful for local development on a single machine, but the managed runtime installer above is now the primary install/update path.
 
 ### Auto-Start on Login
 
@@ -108,7 +115,7 @@ This mode keeps the old `http://localhost:3001` server running outside the packa
 npm run install-service
 ```
 
-Creates a macOS Launch Agent that starts the production server on login and restarts it if it crashes. The app is then always available at http://localhost:3001.
+Creates a macOS LaunchAgent that starts the production server on login and restarts it if it crashes. The app is then always available at http://localhost:3001.
 
 To disable:
 
@@ -116,34 +123,7 @@ To disable:
 npm run uninstall-service
 ```
 
-### Legacy In-App Self-Update
-
-The Settings panel can check for updates and apply the latest `origin/main` automatically.
-
-To enable one-click updates, set:
-
-```bash
-export STRADL_ENABLE_SELF_UPDATE=true
-```
-
-Requirements:
-- `git` and `npm` must be available on PATH
-- LaunchAgent must be installed (`npm run install-service`)
-- Working tree must be clean (no uncommitted local changes)
-- Update request must originate from localhost
-
-When enabled, `Update now` runs:
-- `git fetch origin main`
-- `git pull --ff-only origin main`
-- `npm ci --include=dev`
-- `npm run build`
-- `launchctl kickstart -k gui/$UID/com.stradl.server`
-
-If preflight checks fail, the API returns a clear error:
-- self-update disabled (`STRADL_ENABLE_SELF_UPDATE` not `true`)
-- dirty repo (uncommitted changes)
-- missing LaunchAgent plist
-- another update already running
+The repo-based LaunchAgent mode does not enable one-click self-update. The update UI is only active when Stradl is running from the managed runtime installer.
 
 ## Features
 
@@ -155,7 +135,7 @@ If preflight checks fail, the API returns a clear error:
 - **Vacation mode** -- Add offset hours so tasks don't go stale while you're away
 - **Top N limiting** -- Only show the top N tasks in the Tasks tab
 - **Task backup/import** -- Move tasks between installs or machines with explicit export/import
-- **Desktop packaging** -- macOS Electron app with quit-install-relaunch updates
+- **Managed local runtime** -- macOS installer + LaunchAgent + browser-based one-click updates
 - **PWA** -- Browser install option for web/dev usage
 
 ## Contributing
@@ -169,7 +149,6 @@ If preflight checks fail, the API returns a clear error:
 
 ```
 server/           Express API + JSON file storage
-electron/         Electron shell + desktop updater
 src/              React frontend (Vite)
 scripts/          release + packaging helpers
 ```

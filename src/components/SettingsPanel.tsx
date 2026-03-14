@@ -150,15 +150,13 @@ export default function SettingsPanel({
     setOpen(false);
   };
 
-  const isDesktopRuntime = runtimeInfo?.mode === 'desktop-local';
   const canSelfUpdate = runtimeInfo?.canSelfUpdate === true;
+  const runtimeLabel = canSelfUpdate ? 'Local browser app' : 'Web/PWA';
 
-  const updateStatus = !isDesktopRuntime
-    ? 'Desktop self-update is available in the packaged app.'
-    : !canSelfUpdate
-      ? 'Self-update is unavailable until the packaged app is installed in ~/Applications.'
+  const updateStatus = !canSelfUpdate
+    ? 'Self-update is only available in the installed local runtime.'
     : updateCheckResult == null
-      ? 'Check for updates to see the latest available release.'
+      ? 'Check for updates to see the latest available runtime release.'
       : updateCheckResult.hasUpdate
         ? `Update available: v${updateCheckResult.latestVersion}.`
         : `You're up to date (v${updateCheckResult.currentVersion}).`;
@@ -231,7 +229,7 @@ export default function SettingsPanel({
           <div className="settings-updates-section">
             <h3 className="settings-updates-title">App Updates</h3>
             <p className="settings-help">
-              Runtime: <strong>{isDesktopRuntime ? 'Desktop app' : 'Web/PWA'}</strong>
+              Runtime: <strong>{runtimeLabel}</strong>
             </p>
             <p className="settings-help">
               Current version: <strong>{runtimeInfo?.appVersion || updateCheckResult?.currentVersion || 'Unknown'}</strong>
@@ -255,11 +253,11 @@ export default function SettingsPanel({
               <button
                 className="btn btn-sm"
                 onClick={() => { void onCheckForUpdates(); }}
-                disabled={saving || isCheckingUpdates || isApplyingUpdate || !isDesktopRuntime}
+                disabled={saving || isCheckingUpdates || isApplyingUpdate || !canSelfUpdate}
               >
                 {isCheckingUpdates ? 'Checking...' : 'Check for updates'}
               </button>
-              {isDesktopRuntime && updateCheckResult?.hasUpdate && (
+              {canSelfUpdate && updateCheckResult?.hasUpdate && (
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={() => { void onApplyUpdate(); }}
@@ -268,7 +266,7 @@ export default function SettingsPanel({
                   {isApplyingUpdate ? 'Applying...' : 'Update now'}
                 </button>
               )}
-              {isDesktopRuntime && updateCheckResult?.hasUpdate && (
+              {canSelfUpdate && updateCheckResult?.hasUpdate && (
                 <a
                   className="btn btn-sm"
                   href={updateCheckResult.releaseUrl}
