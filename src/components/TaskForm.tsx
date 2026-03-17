@@ -10,6 +10,8 @@ interface Props {
 
 export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) {
   const [title, setTitle] = useState('');
+  const [status, setStatus] = useState('');
+  const [showStatus, setShowStatus] = useState(false);
   const [priority, setPriority] = useState<string>('P1');
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,9 +24,12 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
     try {
       await onCreate({
         title: title.trim(),
+        ...(status.trim() ? { status: status.trim() } : {}),
         priority: isIdea ? null : priority,
       });
       setTitle('');
+      setStatus('');
+      setShowStatus(false);
     } catch {
       // Error feedback is handled at the app level.
     } finally {
@@ -34,32 +39,54 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
 
   return (
     <form className="task-form" onSubmit={handleSubmit}>
-      <input
-        ref={titleInputRef}
-        type="text"
-        placeholder={activeTab === 'ideas' ? 'New idea...' : 'New task... (press / to focus)'}
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        className="task-form-input"
-        aria-label={activeTab === 'ideas' ? 'New idea title' : 'New task title'}
-        disabled={submitting}
-      />
-      {activeTab !== 'ideas' && (
-        <select
-          value={priority}
-          onChange={e => setPriority(e.target.value)}
-          className="task-form-priority"
-          aria-label="New task priority"
+      <div className="task-form-row">
+        <input
+          ref={titleInputRef}
+          type="text"
+          placeholder={activeTab === 'ideas' ? 'New idea...' : 'New task... (press / to focus)'}
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          className="task-form-input"
+          aria-label={activeTab === 'ideas' ? 'New idea title' : 'New task title'}
           disabled={submitting}
+        />
+        {activeTab !== 'ideas' && (
+          <select
+            value={priority}
+            onChange={e => setPriority(e.target.value)}
+            className="task-form-priority"
+            aria-label="New task priority"
+            disabled={submitting}
+          >
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+          </select>
+        )}
+        <button
+          type="button"
+          className={`btn task-form-status-toggle${showStatus ? ' active' : ''}`}
+          onClick={() => setShowStatus(!showStatus)}
+          title={showStatus ? 'Hide status' : 'Add status'}
+          aria-label={showStatus ? 'Hide status field' : 'Show status field'}
         >
-          <option value="P0">P0</option>
-          <option value="P1">P1</option>
-          <option value="P2">P2</option>
-        </select>
+          +Status
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? 'Adding...' : 'Add'}
+        </button>
+      </div>
+      {showStatus && (
+        <textarea
+          placeholder="Status / description..."
+          value={status}
+          onChange={e => setStatus(e.target.value)}
+          className="task-form-status"
+          aria-label="New task status"
+          disabled={submitting}
+          rows={2}
+        />
       )}
-      <button type="submit" className="btn btn-primary" disabled={submitting}>
-        {submitting ? 'Adding...' : 'Add'}
-      </button>
     </form>
   );
 }
