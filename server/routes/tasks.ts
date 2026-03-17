@@ -31,6 +31,12 @@ function clearInvalidFocus(data: AppData, now = new Date()): boolean {
   return false;
 }
 
+function touchTask(task: Task): string {
+  const now = new Date().toISOString();
+  task.updatedAt = now;
+  return now;
+}
+
 // GET /api/tasks?tab=tasks|backlog|ideas|blocked|hidden|completed|archive
 taskRoutes.get('/tasks', (req, res) => {
   const data = readData();
@@ -167,7 +173,7 @@ taskRoutes.put('/tasks/:id', (req, res) => {
       }
     }
   }
-  task.updatedAt = new Date().toISOString();
+  touchTask(task);
 
   writeData(data);
   res.json(task);
@@ -257,6 +263,7 @@ taskRoutes.post('/tasks/:id/hide', (req, res) => {
     res.status(400).json({ error: 'Provide durationMinutes (15|30|60|120|240) or hideUntilDate (YYYY-MM-DD)' });
     return;
   }
+  touchTask(task);
   clearFocusForTask(data, id);
   writeData(data);
   res.json(task);
@@ -294,6 +301,7 @@ taskRoutes.post('/tasks/:id/focus', (req, res) => {
     return;
   }
 
+  touchTask(task);
   data.settings.focusedTaskId = id;
   writeData(data);
   res.json({ focusedTaskId: data.settings.focusedTaskId });

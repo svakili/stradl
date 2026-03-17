@@ -123,6 +123,17 @@ describe('POST /tasks/:id/blockers', () => {
     expect(res.json.mock.calls[0][0].blockedUntilDate).toBe('2025-06-01T00:00:00Z');
   });
 
+  it('touches updatedAt when adding a blocker', () => {
+    const task = makeTask({ id: 1, updatedAt: '2024-01-01T00:00:00Z' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: {} }), res);
+
+    expect(task.updatedAt).not.toBe('2024-01-01T00:00:00Z');
+  });
+
   it('increments nextBlockerId', () => {
     const data = makeAppData({ tasks: [makeTask({ id: 1 })], nextBlockerId: 10 });
     mockedReadData.mockReturnValue(data);

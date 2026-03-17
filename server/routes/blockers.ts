@@ -33,6 +33,7 @@ blockerRoutes.post('/tasks/:id/blockers', (req, res) => {
   };
 
   data.blockers.push(blocker);
+  task.updatedAt = new Date().toISOString();
   if (data.settings.focusedTaskId === taskId) {
     data.settings.focusedTaskId = null;
   }

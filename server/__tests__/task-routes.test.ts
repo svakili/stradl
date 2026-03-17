@@ -176,6 +176,22 @@ describe('GET /tasks', () => {
     expect(res.json.mock.calls[0][0][0].id).toBe(1);
   });
 
+  it('sorts hidden tasks by earliest unhide time first', () => {
+    const data = makeAppData({
+      tasks: [
+        makeTask({ id: 1, hiddenUntilAt: '2099-01-03T12:00:00Z', updatedAt: '2024-03-01T00:00:00Z' }),
+        makeTask({ id: 2, hiddenUntilAt: '2099-01-01T12:00:00Z', updatedAt: '2024-02-01T00:00:00Z' }),
+        makeTask({ id: 3, hiddenUntilAt: '2099-01-02T12:00:00Z', updatedAt: '2024-01-01T00:00:00Z' }),
+      ],
+    });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ query: { tab: 'hidden' } }), res);
+
+    expect(res.json.mock.calls[0][0].map((task: any) => task.id)).toEqual([2, 3, 1]);
+  });
+
   it('excludes expired hidden tasks from hidden tab', () => {
     const data = makeAppData({
       tasks: [makeTask({ id: 1, hiddenUntilAt: '2020-01-01T00:00:00Z' })],
@@ -476,6 +492,17 @@ describe('PUT /tasks/:id', () => {
     expect(res.json.mock.calls[0][0].isArchived).toBe(true);
   });
 
+  it('touches updatedAt when archiving', () => {
+    const task = makeTask({ id: 1, isArchived: false, updatedAt: '2024-01-01T00:00:00Z' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { isArchived: true } }), res);
+
+    expect(res.json.mock.calls[0][0].updatedAt).not.toBe('2024-01-01T00:00:00Z');
+  });
+
   it('clears hiddenUntilAt and focusedTaskId when archiving', () => {
     const task = makeTask({ id: 1, isArchived: false, hiddenUntilAt: '2099-01-01T00:00:00Z' });
     const data = makeAppData({
@@ -639,6 +666,17 @@ describe('POST /tasks/:id/hide', () => {
     expect(res.json.mock.calls[0][0].hiddenUntilAt).not.toBeNull();
   });
 
+  it('touches updatedAt when hiding a task', () => {
+    const task = makeTask({ id: 1, priority: 'P1', hiddenUntilAt: null, updatedAt: '2024-01-01T00:00:00Z' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' }, body: { durationMinutes: 30 } }), res);
+
+    expect(res.json.mock.calls[0][0].updatedAt).not.toBe('2024-01-01T00:00:00Z');
+  });
+
   it('rejects invalid durations', () => {
     const task = makeTask({ id: 1, priority: 'P1' });
     const data = makeAppData({ tasks: [task] });
@@ -720,6 +758,17 @@ describe('POST /tasks/:id/focus', () => {
     handler(mockReq({ params: { id: '1' } }), res);
 
     expect(data.settings.focusedTaskId).toBe(1);
+  });
+
+  it('touches updatedAt when focusing a task', () => {
+    const task = makeTask({ id: 1, priority: 'P1', hiddenUntilAt: null, updatedAt: '2024-01-01T00:00:00Z' });
+    const data = makeAppData({ tasks: [task] });
+    mockedReadData.mockReturnValue(data);
+    const res = mockRes();
+
+    handler(mockReq({ params: { id: '1' } }), res);
+
+    expect(task.updatedAt).not.toBe('2024-01-01T00:00:00Z');
   });
 
   it('replaces previous focusedTaskId', () => {
