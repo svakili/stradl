@@ -441,6 +441,16 @@ textarea:focus-visible,
   min-width: 0;
 }
 
+.task-title-text a {
+  color: var(--blue-600);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.task-title-text a:hover {
+  color: var(--blue-700);
+}
+
 /* Status section - full width below title row */
 .task-status-section {
   cursor: pointer;
@@ -449,14 +459,33 @@ textarea:focus-visible,
 }
 
 .status-display {
-  white-space: pre-wrap;
-  word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.status-preview {
+  width: 100%;
+  overflow: hidden;
+}
+
+.status-preview-collapsed {
+  max-height: calc(0.875rem * 1.5 * 4);
+}
+
+.status-preview-expanded {
+  max-height: none;
 }
 
 .status-text {
   color: var(--text-secondary);
   font-size: 0.875rem;
   line-height: 1.5;
+  display: block;
+  width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .status-text a {
@@ -473,6 +502,22 @@ textarea:focus-visible,
   color: var(--text-placeholder);
   font-size: 0.8125rem;
   font-style: italic;
+}
+
+.status-toggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--blue-600);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.status-toggle:hover {
+  color: var(--blue-700);
+  text-decoration: underline;
 }
 
 .status-textarea {

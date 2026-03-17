@@ -41,6 +41,7 @@ const HIDE_PRESETS: Array<{ minutes: 15 | 30 | 60 | 120 | 240; label: string }> 
   { minutes: 120, label: '2h' },
   { minutes: 240, label: '4h' },
 ];
+const STATUS_PREVIEW_LINES = 4;
 
 function formatHiddenTimestamp(hiddenUntilAt: string | null): string {
   if (!hiddenUntilAt) return 'Hidden temporarily';
@@ -88,10 +89,14 @@ export default function TaskRow({
   const [showHideMenu, setShowHideMenu] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [hideDateValue, setHideDateValue] = useState('');
+  const [isStatusExpanded, setIsStatusExpanded] = useState(false);
+  const [isStatusOverflowing, setIsStatusOverflowing] = useState(false);
   const skipNextTitleBlurSaveRef = useRef(false);
   const skipNextStatusBlurSaveRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hideMenuRef = useRef<HTMLDivElement>(null);
+  const statusPreviewRef = useRef<HTMLDivElement>(null);
+  const statusTextRef = useRef<HTMLDivElement>(null);
 
   const tomorrow = useMemo(() => {
     const d = new Date();
@@ -141,6 +146,67 @@ export default function TaskRow({
       autoResizeTextarea(textareaRef.current);
     }
   }, [editingStatus, autoResizeTextarea]);
+
+  const measureStatusOverflow = useCallback(() => {
+    const statusTextEl = statusTextRef.current;
+    if (editingStatus || !statusTextEl || !task.status) {
+      setIsStatusOverflowing(false);
+      if (!task.status) {
+        setIsStatusExpanded(false);
+      }
+      return;
+    }
+
+    const computedStyle = window.getComputedStyle(statusTextEl);
+    let lineHeight = parseFloat(computedStyle.lineHeight);
+    if (Number.isNaN(lineHeight)) {
+      const fontSize = parseFloat(computedStyle.fontSize);
+      lineHeight = Number.isNaN(fontSize) ? 0 : fontSize * 1.5;
+    }
+
+    const maxPreviewHeight = lineHeight * STATUS_PREVIEW_LINES;
+    const contentHeight = statusTextEl.scrollHeight;
+    const overflowing = maxPreviewHeight > 0 && contentHeight > maxPreviewHeight + 1;
+
+    setIsStatusOverflowing(prev => (prev === overflowing ? prev : overflowing));
+    if (!overflowing) {
+      setIsStatusExpanded(false);
+    }
+  }, [editingStatus, task.status]);
+
+  useEffect(() => {
+    measureStatusOverflow();
+
+    if (editingStatus || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const previewEl = statusPreviewRef.current;
+    const textEl = statusTextRef.current;
+    if (!previewEl && !textEl) {
+      return;
+    }
+
+    let frameId = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        measureStatusOverflow();
+      });
+    });
+
+    if (previewEl) {
+      observer.observe(previewEl);
+    }
+    if (textEl && textEl !== previewEl) {
+      observer.observe(textEl);
+    }
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [editingStatus, measureStatusOverflow]);
 
   // Auto-load blockers when mounting on the blocked tab
   useEffect(() => {
@@ -223,6 +289,10 @@ export default function TaskRow({
     isFocused ? 'task-row-focused' : '',
     recentlyUpdated ? 'task-row-highlight' : '',
   ].filter(Boolean).join(' ');
+  const statusPreviewClasses = [
+    'status-preview',
+    isStatusExpanded ? 'status-preview-expanded' : 'status-preview-collapsed',
+  ].join(' ');
 
   return (
     <div className={rowClasses} style={{ backgroundColor: bgColor }} aria-busy={isPending}>
@@ -244,7 +314,10 @@ export default function TaskRow({
           className="task-title"
           role="button"
           tabIndex={isPending ? -1 : 0}
-          onClick={openTitleEditor}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('a')) return;
+            openTitleEditor();
+          }}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
             if (e.key === 'Enter' || e.key === ' ') {
@@ -283,7 +356,7 @@ export default function TaskRow({
             <span className="task-title-display">
               <span className="task-id-badge">#{task.id}</span>
               {isFocused && <span className="task-now-pill">Now</span>}
-              <span className="task-title-text">{task.title}</span>
+              <span className="task-title-text">{linkifyText(task.title)}</span>
             </span>
           )}
         </div>
@@ -312,20 +385,20 @@ export default function TaskRow({
             </>
           ) : activeTab === 'hidden' ? (
             <>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
-              <button className="btn btn-sm" onClick={() => onUnhide(task.id)} disabled={isPending} aria-label={`Unhide ${task.title}`}>Unhide</button>
               <button className="btn btn-sm btn-primary" onClick={() => onFocusToggle(task.id, { unhideFirst: true })} disabled={isPending} aria-label={`Focus ${task.title} now`}>Now</button>
+              <button className="btn btn-sm" onClick={() => onUnhide(task.id)} disabled={isPending} aria-label={`Unhide ${task.title}`}>Unhide</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
             </>
           ) : activeTab === 'ideas' ? (
             <>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
               <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
             </>
           ) : activeTab === 'tasks' ? (
             <>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <div className="hide-menu" ref={hideMenuRef}>
                 <button
                   className="btn btn-sm btn-primary"
@@ -407,21 +480,21 @@ export default function TaskRow({
                 )}
               </div>
               <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
-              <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
             </>
           ) : activeTab === 'blocked' ? (
             <>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
               <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
             </>
           ) : (
             <>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
-              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
+              <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
             </>
           )}
         </div>
@@ -484,7 +557,31 @@ export default function TaskRow({
         ) : (
           <div className="status-display">
             {task.status ? (
-              <span className="status-text">{linkifyText(task.status)}</span>
+              <>
+                <div
+                  ref={statusPreviewRef}
+                  id={`task-status-preview-${task.id}`}
+                  className={statusPreviewClasses}
+                >
+                  <div ref={statusTextRef} className="status-text">
+                    {linkifyText(task.status)}
+                  </div>
+                </div>
+                {isStatusOverflowing && (
+                  <button
+                    type="button"
+                    className="status-toggle"
+                    aria-controls={`task-status-preview-${task.id}`}
+                    aria-expanded={isStatusExpanded}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsStatusExpanded(prev => !prev);
+                    }}
+                  >
+                    {isStatusExpanded ? 'Less' : 'More'}
+                  </button>
+                )}
+              </>
             ) : (
               <span className="status-placeholder">Click to add status...</span>
             )}
