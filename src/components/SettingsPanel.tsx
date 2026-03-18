@@ -25,6 +25,7 @@ interface Props {
   isImportingData: boolean;
   onExportData: () => Promise<void>;
   onImportData: (data: StoredAppData) => Promise<void>;
+  onTriggerVacationOffset: () => void;
 }
 
 interface SettingsDraft {
@@ -61,6 +62,7 @@ export default function SettingsPanel({
   isImportingData,
   onExportData,
   onImportData,
+  onTriggerVacationOffset,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -224,7 +226,16 @@ export default function SettingsPanel({
           </label>
           <p className="settings-help">How many prioritized tasks show on Tasks. The rest go to Backlog.</p>
           {errors.topN && <p className="settings-error">{errors.topN}</p>}
-          <p className="settings-help">Vacation adjustments are handled with an inactivity popup when no active task has been updated recently.</p>
+          <div className="settings-vacation-row">
+            <p className="settings-help">Apply a one-time staleness offset if you were away.</p>
+            <button
+              className="btn btn-sm"
+              onClick={onTriggerVacationOffset}
+              disabled={saving}
+            >
+              Apply vacation offset
+            </button>
+          </div>
 
           <div className="settings-updates-section">
             <h3 className="settings-updates-title">App Updates</h3>
@@ -308,6 +319,32 @@ export default function SettingsPanel({
                 onChange={(event) => { void handleImportSelection(event); }}
               />
             </div>
+          </div>
+
+          <div className="settings-updates-section">
+            <h3 className="settings-updates-title">Help &amp; FAQ</h3>
+            <details className="settings-help-details">
+              <summary>How to update Stradl</summary>
+              <div className="settings-help-content">
+                <p><strong>Option 1 — In-app update (managed runtime)</strong></p>
+                <p>
+                  If Stradl is installed via the managed runtime, use the <em>Check for updates</em> button
+                  in the App Updates section above. When a new version is available, click <em>Update now</em>.
+                  The app will download, verify, and apply the update automatically.
+                </p>
+                <p><strong>Option 2 — Manual update (terminal)</strong></p>
+                <p>
+                  Re-run the installer to pull the latest release from GitHub:
+                </p>
+                <pre className="settings-help-code">curl -fsSL https://raw.githubusercontent.com/svakili/stradl/main/scripts/install-stradl.sh | bash</pre>
+                <p>
+                  This downloads the latest tarball, verifies its checksum, extracts the new runtime, and restarts the service.
+                </p>
+                <p className="settings-help-note">
+                  Your task data is never overwritten during updates. A backup snapshot is created automatically before each update.
+                </p>
+              </div>
+            </details>
           </div>
 
           {submitError && <p className="settings-submit-error">{submitError}</p>}
