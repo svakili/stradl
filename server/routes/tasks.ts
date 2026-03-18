@@ -301,6 +301,10 @@ taskRoutes.post('/tasks/:id/focus', (req, res) => {
     return;
   }
 
+  if (data.settings.focusedTaskId !== null && data.settings.focusedTaskId !== id) {
+    const prev = data.tasks.find(t => t.id === data.settings.focusedTaskId);
+    if (prev) touchTask(prev);
+  }
   touchTask(task);
   data.settings.focusedTaskId = id;
   writeData(data);
@@ -310,6 +314,10 @@ taskRoutes.post('/tasks/:id/focus', (req, res) => {
 // POST /api/tasks/focus/clear
 taskRoutes.post('/tasks/focus/clear', (_req, res) => {
   const data = readData();
+  if (data.settings.focusedTaskId !== null) {
+    const prev = data.tasks.find(t => t.id === data.settings.focusedTaskId);
+    if (prev) touchTask(prev);
+  }
   data.settings.focusedTaskId = null;
   writeData(data);
   res.json({ focusedTaskId: null });

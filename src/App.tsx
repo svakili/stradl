@@ -11,7 +11,7 @@ import TaskTable from './components/TaskTable';
 import TaskForm from './components/TaskForm';
 import SettingsPanel from './components/SettingsPanel';
 import VacationNudgeModal from './components/VacationNudgeModal';
-import { getVacationNudgeRecommendation } from './utils/vacationNudge';
+import { getVacationNudgeRecommendation, getManualVacationRecommendation } from './utils/vacationNudge';
 
 interface ToastState {
   id: number;
@@ -518,6 +518,14 @@ export default function App() {
     }
   }, [isImportingData, loadCounts, reload, reloadSettings, showToast]);
 
+  const handleManualVacationNudge = useCallback(() => {
+    const recommendation = getManualVacationRecommendation(allTasks);
+    setVacationSuggestedDays(recommendation.suggestedDays);
+    setVacationInactivityDays(recommendation.inactivityDays);
+    setVacationAnchorUpdatedAt(recommendation.mostRecentActiveUpdatedAt);
+    setShowVacationNudge(true);
+  }, [allTasks]);
+
   const handleApplyVacationNudge = async (days: number) => {
     if (!vacationAnchorUpdatedAt) return;
 
@@ -653,6 +661,7 @@ export default function App() {
             isImportingData={isImportingData}
             onExportData={handleExportData}
             onImportData={handleImportData}
+            onTriggerVacationOffset={handleManualVacationNudge}
           />
         </div>
       </header>

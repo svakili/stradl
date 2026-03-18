@@ -836,6 +836,49 @@ textarea:focus-visible,
   margin-top: -0.25rem;
 }
 
+/* Help & FAQ */
+.settings-help-details summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0.25rem 0;
+}
+
+.settings-help-details summary:hover {
+  color: var(--accent);
+}
+
+.settings-help-content {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 0.5rem;
+}
+
+.settings-help-content p {
+  margin-bottom: 0.5rem;
+}
+
+.settings-help-code {
+  display: block;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 0.6875rem;
+  font-family: monospace;
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.settings-help-note {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 /* Dark Mode Toggle */
 .theme-toggle {
   border: none;
