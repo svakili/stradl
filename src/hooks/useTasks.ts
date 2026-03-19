@@ -28,19 +28,20 @@ export function useTasks(tab: TabName) {
     return () => window.clearInterval(intervalId);
   }, [reload]);
 
-  const create = async (data: { title: string; status?: string; priority?: string | null }) => {
+  const create = async (data: { title: string; status?: string; priority?: string | null; recurrence?: string | null }) => {
     await api.createTask(data);
     await reload();
   };
 
-  const update = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => {
+  const update = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'recurrence'>>) => {
     await api.updateTask(id, data);
     await reload();
   };
 
-  const complete = async (id: number) => {
-    await api.completeTask(id);
+  const complete = async (id: number): Promise<Task> => {
+    const result = await api.completeTask(id);
     await reload();
+    return result;
   };
 
   const uncomplete = async (id: number) => {

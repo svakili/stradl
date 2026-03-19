@@ -1,3 +1,5 @@
+export type Recurrence = 'daily' | 'weekly' | 'biweekly' | 'monthly' | null;
+
 export interface Task {
   id: number;
   title: string;
@@ -8,6 +10,7 @@ export interface Task {
   completedAt: string | null;
   isArchived: boolean;
   hiddenUntilAt: string | null;
+  recurrence: Recurrence;
 }
 
 export interface Blocker {

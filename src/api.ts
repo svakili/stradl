@@ -38,10 +38,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 export const fetchTasks = (tab: TabName) =>
   request<Task[]>(`/tasks?tab=${tab}`);
 
-export const createTask = (data: { title: string; status?: string; priority?: string | null }) =>
+export const createTask = (data: { title: string; status?: string; priority?: string | null; recurrence?: string | null }) =>
   request<Task>('/tasks', { method: 'POST', body: JSON.stringify(data) });
 
-export const updateTask = (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) =>
+export const updateTask = (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'recurrence'>>) =>
   request<Task>(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 export const completeTask = (id: number) =>

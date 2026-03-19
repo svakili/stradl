@@ -120,13 +120,14 @@ taskRoutes.get('/tasks', (req, res) => {
 // POST /api/tasks
 taskRoutes.post('/tasks', (req, res) => {
   const data = readData();
-  const { title, status, priority } = req.body;
+  const { title, status, priority, recurrence } = req.body;
 
   if (!title || typeof title !== 'string') {
     res.status(400).json({ error: 'title is required' });
     return;
   }
 
+  const validRecurrences = ['daily', 'weekly', 'biweekly', 'monthly'];
   const now = new Date().toISOString();
   const task: Task = {
     id: data.nextTaskId++,
@@ -138,6 +139,7 @@ taskRoutes.post('/tasks', (req, res) => {
     completedAt: null,
     isArchived: false,
     hiddenUntilAt: null,
+    recurrence: validRecurrences.includes(recurrence) ? recurrence : null,
   };
 
   data.tasks.push(task);
@@ -156,10 +158,14 @@ taskRoutes.put('/tasks/:id', (req, res) => {
     return;
   }
 
-  const { title, status, priority, isArchived } = req.body;
+  const { title, status, priority, isArchived, recurrence } = req.body;
   if (title !== undefined) task.title = title.trim();
   if (status !== undefined) task.status = typeof status === 'string' ? status.trim() : status;
   if (priority !== undefined) task.priority = priority || null;
+  if (recurrence !== undefined) {
+    const validRecurrences = ['daily', 'weekly', 'biweekly', 'monthly'];
+    task.recurrence = validRecurrences.includes(recurrence) ? recurrence : null;
+  }
   if (isArchived !== undefined) {
     task.isArchived = isArchived;
     // Resolve blockers that depend on this task when archiving
@@ -191,8 +197,18 @@ taskRoutes.post('/tasks/:id/complete', (req, res) => {
   }
 
   const now = new Date().toISOString();
-  task.completedAt = now;
-  task.updatedAt = now;
+
+  if (task.recurrence) {
+    // Recurring task: hide until next occurrence instead of completing
+    const intervalDays: Record<string, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: 30 };
+    const ms = intervalDays[task.recurrence] * 24 * 60 * 60 * 1000;
+    task.hiddenUntilAt = new Date(Date.now() + ms).toISOString();
+    task.completedAt = null;
+    task.updatedAt = now;
+  } else {
+    task.completedAt = now;
+    task.updatedAt = now;
+  }
 
   // Resolve blockers that depend on this task
   for (const blocker of data.blockers) {

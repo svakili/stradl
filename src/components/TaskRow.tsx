@@ -16,7 +16,7 @@ interface Props {
   blockers: Blocker[];
   activeTab: TabName;
   recentlyUpdated?: boolean;
-  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => Promise<void>;
+  onUpdate: (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'recurrence'>>) => Promise<void>;
   onComplete: (id: number) => Promise<void>;
   onHide: (id: number, durationMinutes: 15 | 30 | 60 | 120 | 240) => Promise<void>;
   onHideUntilDate: (id: number, date: string) => Promise<void>;
@@ -310,6 +310,22 @@ export default function TaskRow({
           <option value="P2">P2</option>
         </select>
 
+        {(activeTab === 'tasks' || activeTab === 'backlog' || activeTab === 'ideas' || activeTab === 'hidden') && (
+          <select
+            value={task.recurrence || ''}
+            onChange={e => onUpdate(task.id, { recurrence: (e.target.value || null) as Task['recurrence'] })}
+            className="recurrence-select"
+            aria-label={`Recurrence for ${task.title}`}
+            disabled={isPending}
+          >
+            <option value="">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Biweekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        )}
+
         <div
           className="task-title"
           role="button"
@@ -356,6 +372,7 @@ export default function TaskRow({
             <span className="task-title-display">
               <span className="task-id-badge">#{task.id}</span>
               {isFocused && <span className="task-now-pill">Now</span>}
+              {task.recurrence && <span className="task-recurrence-badge">{task.recurrence}</span>}
               <span className="task-title-text">{linkifyText(task.title)}</span>
             </span>
           )}
@@ -388,13 +405,13 @@ export default function TaskRow({
               <button className="btn btn-sm btn-primary" onClick={() => onFocusToggle(task.id, { unhideFirst: true })} disabled={isPending} aria-label={`Focus ${task.title} now`}>Now</button>
               <button className="btn btn-sm" onClick={() => onUnhide(task.id)} disabled={isPending} aria-label={`Unhide ${task.title}`}>Unhide</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>{task.recurrence ? 'Cycle' : 'Done'}</button>
             </>
           ) : activeTab === 'ideas' ? (
             <>
               <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>{task.recurrence ? 'Cycle' : 'Done'}</button>
             </>
           ) : activeTab === 'tasks' ? (
             <>
@@ -481,20 +498,20 @@ export default function TaskRow({
               </div>
               <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>{task.recurrence ? 'Cycle' : 'Done'}</button>
             </>
           ) : activeTab === 'blocked' ? (
             <>
               <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>{task.recurrence ? 'Cycle' : 'Done'}</button>
             </>
           ) : (
             <>
               <button className="btn btn-sm" onClick={() => onFocusToggle(task.id)} disabled={isPending} aria-label={`Toggle focus for ${task.title}`}>{isFocused ? 'Clear Now' : 'Now'}</button>
               <button className="btn btn-sm" onClick={toggleBlockers} disabled={isPending} aria-label={`Manage blockers for ${task.title}`}>Block</button>
               <button className="btn btn-sm" onClick={() => onUpdate(task.id, { isArchived: true })} disabled={isPending} aria-label={`Archive ${task.title}`}>Archive</button>
-              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>Done</button>
+              <button className="btn btn-sm btn-success" onClick={() => onComplete(task.id)} disabled={isPending} aria-label={`Mark ${task.title} as done`}>{task.recurrence ? 'Cycle' : 'Done'}</button>
             </>
           )}
         </div>
