@@ -5,7 +5,7 @@ import type { TabName } from '../types';
 interface Props {
   activeTab: TabName;
   titleInputRef?: RefObject<HTMLInputElement>;
-  onCreate: (data: { title: string; status?: string; priority?: string | null }) => Promise<void>;
+  onCreate: (data: { title: string; status?: string; priority?: string | null; recurrence?: string | null }) => Promise<void>;
 }
 
 export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) {
@@ -13,6 +13,7 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
   const [status, setStatus] = useState('');
   const [showStatus, setShowStatus] = useState(false);
   const [priority, setPriority] = useState<string>('P1');
+  const [recurrence, setRecurrence] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,9 +27,11 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
         title: title.trim(),
         ...(status.trim() ? { status: status.trim() } : {}),
         priority: isIdea ? null : priority,
+        ...(recurrence ? { recurrence } : {}),
       });
       setTitle('');
       setStatus('');
+      setRecurrence('');
       setShowStatus(false);
     } catch {
       // Error feedback is handled at the app level.
@@ -63,6 +66,19 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
             <option value="P2">P2</option>
           </select>
         )}
+        <select
+          value={recurrence}
+          onChange={e => setRecurrence(e.target.value)}
+          className="task-form-recurrence"
+          aria-label="New task recurrence"
+          disabled={submitting}
+        >
+          <option value="">Once</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
         <button
           type="button"
           className={`btn task-form-status-toggle${showStatus ? ' active' : ''}`}

@@ -260,7 +260,8 @@ textarea:focus-visible,
   box-shadow: 0 0 0 2px var(--blue-ring);
 }
 
-.task-form-priority {
+.task-form-priority,
+.task-form-recurrence {
   padding: 0.5rem;
   border: 1px solid var(--border-default);
   border-radius: 0.375rem;
@@ -433,6 +434,17 @@ textarea:focus-visible,
   text-transform: uppercase;
   box-shadow: 0 1px 2px var(--shadow-sm);
 }
+.task-recurrence-badge {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.125rem 0.375rem;
+  text-transform: capitalize;
+}
 .task-title-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -561,7 +573,8 @@ textarea:focus-visible,
   color: var(--text-primary);
 }
 
-.priority-select {
+.priority-select,
+.recurrence-select {
   padding: 0.25rem;
   border: 1px solid var(--border-default);
   border-radius: 0.25rem;
@@ -1191,7 +1204,8 @@ textarea:focus-visible,
     margin-top: 0.375rem;
   }
 
-  .priority-select {
+  .priority-select,
+  .recurrence-select {
     width: 100%;
   }
 
@@ -1222,7 +1236,9 @@ textarea:focus-visible,
   .btn,
   .task-form-input,
   .task-form-priority,
+  .task-form-recurrence,
   .priority-select,
+  .recurrence-select,
   .settings-field input,
   .blocker-form select,
   .blocker-form input {

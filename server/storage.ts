@@ -19,6 +19,8 @@ interface ResolveStoragePathsOptions {
   homeDir?: string;
 }
 
+export type Recurrence = 'daily' | 'weekly' | 'biweekly' | 'monthly' | null;
+
 export interface Task {
   id: number;
   title: string;
@@ -29,6 +31,7 @@ export interface Task {
   completedAt: string | null;
   isArchived: boolean;
   hiddenUntilAt: string | null;
+  recurrence: Recurrence;
 }
 
 export interface Blocker {
@@ -252,6 +255,10 @@ function isPriority(value: unknown): value is Task['priority'] {
   return value === 'P0' || value === 'P1' || value === 'P2' || value === null;
 }
 
+function isRecurrence(value: unknown): value is Recurrence {
+  return value === 'daily' || value === 'weekly' || value === 'biweekly' || value === 'monthly' || value === null;
+}
+
 function coerceTask(value: unknown, index: number): Task {
   if (!isRecord(value)) {
     throw new Error(`Task at index ${index} is invalid.`);
@@ -283,6 +290,7 @@ function coerceTask(value: unknown, index: number): Task {
     completedAt,
     isArchived: typeof value.isArchived === 'boolean' ? value.isArchived : isDeleted,
     hiddenUntilAt,
+    recurrence: isRecurrence(value.recurrence) ? value.recurrence : null,
   };
 }
 

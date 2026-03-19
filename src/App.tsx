@@ -263,7 +263,7 @@ export default function App() {
     }
   }, [showToast, markRecentlyUpdated, reloadSettings]);
 
-  const handleCreate = async (data: { title: string; status?: string; priority?: string | null }) => {
+  const handleCreate = async (data: { title: string; status?: string; priority?: string | null; recurrence?: string | null }) => {
     try {
       await create(data);
       await loadCounts();
@@ -274,7 +274,7 @@ export default function App() {
     }
   };
 
-  const handleUpdate = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived'>>) => {
+  const handleUpdate = async (id: number, data: Partial<Pick<Task, 'title' | 'status' | 'priority' | 'isArchived' | 'recurrence'>>) => {
     const undoAction = data.isArchived !== undefined
       ? () => {
           void handleUpdate(id, { isArchived: !data.isArchived });
@@ -299,11 +299,19 @@ export default function App() {
   };
 
   const handleComplete = async (id: number) => {
+    const RECURRENCE_LABELS: Record<string, string> = { daily: '1 day', weekly: '1 week', biweekly: '2 weeks', monthly: '30 days' };
     await runTaskAction(id, async () => {
-      await complete(id);
+      const result = await complete(id);
       await loadCounts();
-    }, 'Task completed.', () => {
-      void handleUncomplete(id);
+      if (result.recurrence && !result.completedAt) {
+        showToast(`Task cycled. Returns in ${RECURRENCE_LABELS[result.recurrence]}.`, 'success', () => {
+          void handleUnhide(id);
+        });
+      } else {
+        showToast('Task completed.', 'success', () => {
+          void handleUncomplete(id);
+        });
+      }
     });
   };
 
