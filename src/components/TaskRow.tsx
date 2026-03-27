@@ -278,7 +278,7 @@ export default function TaskRow({
   };
 
   const timestamp = activeTab === 'completed' && task.completedAt
-    ? `Completed ${relativeTime(task.completedAt)}`
+    ? `Completed ${relativeTime(task.completedAt)} · ${new Date(task.completedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
     : activeTab === 'hidden'
       ? formatHiddenTimestamp(task.hiddenUntilAt)
       : `Updated ${relativeTime(task.updatedAt)}`;
