@@ -12,7 +12,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `npx tsc --noEmit` | Type-check frontend code |
 | `npx tsc -p tsconfig.server.json --noEmit` | Type-check server code |
 
+| `node scripts/release.js <patch\|minor\|major>` | Create a full release (bump version, build, package runtime, push, create GitHub release with assets) |
+| `npm run package:runtime` | Build and package runtime tarball + checksums into `release/` |
+
 No test runner or linter is configured.
+
+### Releasing
+
+Use `node scripts/release.js patch` (or `minor`/`major`) from the `main` branch with a clean working tree. The script:
+
+1. Bumps the version in `package.json` via `npm version`
+2. Builds frontend and server (`npm run package:runtime`)
+3. Generates `release/Stradl-runtime-v<version>.tar.gz`, `release/install-stradl.sh`, and `release/SHA256SUMS.txt`
+4. Pushes the version commit and tag to `origin/main`
+5. Creates a GitHub release with all three assets via `gh release create`
+
+Do **not** create releases manually with `gh release create` — the assets will be missing. Always use the release script.
 
 ## Architecture
 
