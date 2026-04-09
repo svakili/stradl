@@ -3,7 +3,7 @@
 [![CI](https://github.com/svakili/stradl/actions/workflows/ci.yml/badge.svg)](https://github.com/svakili/stradl/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-A single-user local task management app for multitasking. Tracks tasks with priorities (P0/P1/P2/Ideas), free-text statuses, blocking relationships, and staleness indicators. The same React UI can run as a browser/PWA build or as a managed local runtime on macOS with one-click updates.
+A single-user local task management app for multitasking. Tracks tasks with priorities (P0/P1/P2/P3/Ideas), free-text statuses, blocking relationships, and staleness indicators. The same React UI can run as a browser/PWA build or as a managed local runtime on macOS with one-click updates.
 
 > Project status: early-stage. Current contribution scope is intentionally narrow to docs and small fixes. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
@@ -127,8 +127,8 @@ The repo-based LaunchAgent mode does not enable one-click self-update. The updat
 
 ## Features
 
-- **Priority tabs** -- Tasks (P0/P1/P2), Ideas (no priority), Blocked, Archive
-- **Row colors** -- P0 red, P1 yellow, P2 green, Ideas gray, Stale purple
+- **Priority tabs** -- Tasks (P0/P1/P2/P3), Ideas (no priority), Blocked, Archive
+- **Row colors** -- P0 red, P1 yellow, P2 green, P3 blue, Ideas gray, Stale purple
 - **Inline editing** -- Click title or status to edit in place
 - **Blocking** -- Block a task on another task or until a date; auto-unblocks when the condition is met
 - **Staleness** -- Tasks not updated within the threshold turn purple

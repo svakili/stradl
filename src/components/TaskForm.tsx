@@ -64,6 +64,7 @@ export default function TaskForm({ activeTab, titleInputRef, onCreate }: Props) 
             <option value="P0">P0</option>
             <option value="P1">P1</option>
             <option value="P2">P2</option>
+            <option value="P3">P3</option>
           </select>
         )}
         <select

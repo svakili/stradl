@@ -48,7 +48,7 @@ React Components → Custom Hooks (useTasks/useBlockers/useSettings)
 ### Tab System & Task Filtering
 
 All tab filtering happens server-side in `server/routes/tasks.ts`:
-- **Tasks**: Top N prioritized tasks (P0→P1→P2, then by updatedAt)
+- **Tasks**: Top N prioritized tasks (P0→P1→P2→P3, then by updatedAt)
 - **Backlog**: Overflow beyond top N, same sort order
 - **Ideas**: Tasks with `priority === null`
 - **Blocked**: Tasks with unresolved blockers (auto-unblock runs on every GET)
@@ -61,7 +61,7 @@ The `getPrioritizedTasks()` helper in `server/routes/tasks.ts` is shared between
 
 - **Inline editing**: TaskRow uses local state (`useState`) for title/status editing, synced back via `onUpdate` prop
 - **Status field**: Multi-line textarea with auto-resize, URL auto-linking via `src/utils/linkify.tsx`
-- **Row coloring**: P0=red (`#fee2e2`), P1=yellow (`#fef9c3`), P2=green (`#dcfce7`), Ideas=gray, Stale=purple (`#e9d5ff`)
+- **Row coloring**: P0=red (`#fee2e2`), P1=yellow (`#fef9c3`), P2=green (`#dcfce7`), P3=blue (`#dbeafe`), Ideas=gray, Stale=purple (`#e9d5ff`)
 - **Staleness**: `src/utils/staleness.ts` compares `updatedAt` against threshold + vacation offset
 - **Counts refresh**: `App.tsx` loads counts for all 6 tabs after every mutation via `loadCounts()`
 

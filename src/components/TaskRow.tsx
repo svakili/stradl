@@ -33,6 +33,7 @@ const ROW_COLORS: Record<string, string> = {
   P0: 'var(--row-p0)',
   P1: 'var(--row-p1)',
   P2: 'var(--row-p2)',
+  P3: 'var(--row-p3)',
 };
 const HIDE_PRESETS: Array<{ minutes: 15 | 30 | 60 | 120 | 240; label: string }> = [
   { minutes: 15, label: '15m' },
@@ -288,6 +289,7 @@ export default function TaskRow({
     isPending ? 'task-row-pending' : '',
     isFocused ? 'task-row-focused' : '',
     recentlyUpdated ? 'task-row-highlight' : '',
+    showHideMenu ? 'task-row--menu-open' : '',
   ].filter(Boolean).join(' ');
   const statusPreviewClasses = [
     'status-preview',
@@ -308,6 +310,7 @@ export default function TaskRow({
           <option value="P0">P0</option>
           <option value="P1">P1</option>
           <option value="P2">P2</option>
+          <option value="P3">P3</option>
         </select>
 
         {(activeTab === 'tasks' || activeTab === 'backlog' || activeTab === 'ideas' || activeTab === 'hidden') && (

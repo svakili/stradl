@@ -12,6 +12,7 @@ const PRIORITY_RANK: Record<NonNullable<Task['priority']>, number> = {
   P0: 0,
   P1: 1,
   P2: 2,
+  P3: 3,
 };
 
 function parseTaskIdInput(value: string): number | null {
@@ -21,8 +22,8 @@ function parseTaskIdInput(value: string): number | null {
 }
 
 function compareTasks(a: Task, b: Task): number {
-  const aPriorityRank = a.priority ? PRIORITY_RANK[a.priority] : 3;
-  const bPriorityRank = b.priority ? PRIORITY_RANK[b.priority] : 3;
+  const aPriorityRank = a.priority ? PRIORITY_RANK[a.priority] : 4;
+  const bPriorityRank = b.priority ? PRIORITY_RANK[b.priority] : 4;
   if (aPriorityRank !== bPriorityRank) return aPriorityRank - bPriorityRank;
 
   const aUpdated = new Date(a.updatedAt).getTime();

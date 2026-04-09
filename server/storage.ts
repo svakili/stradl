@@ -25,7 +25,7 @@ export interface Task {
   id: number;
   title: string;
   status: string;
-  priority: 'P0' | 'P1' | 'P2' | null;
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -252,7 +252,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPriority(value: unknown): value is Task['priority'] {
-  return value === 'P0' || value === 'P1' || value === 'P2' || value === null;
+  return value === 'P0' || value === 'P1' || value === 'P2' || value === 'P3' || value === null;
 }
 
 function isRecurrence(value: unknown): value is Recurrence {

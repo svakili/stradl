@@ -31,6 +31,7 @@
   --row-p0: #fee2e2;
   --row-p1: #fef9c3;
   --row-p2: #dcfce7;
+  --row-p3: #dbeafe;
   --row-idea: #f3f4f6;
   --row-stale: #e9d5ff;
   --blocker-bg: rgba(255,255,255,0.6);
@@ -76,6 +77,7 @@
   --row-p0: #3b1a1a;
   --row-p1: #3b3510;
   --row-p2: #1a3b2a;
+  --row-p3: #1a2a3b;
   --row-idea: #1f2937;
   --row-stale: #2e1a4a;
   --blocker-bg: rgba(55, 65, 81, 0.6);
@@ -393,6 +395,11 @@ textarea:focus-visible,
 .task-row:hover {
   box-shadow: var(--shadow-hover);
   transform: translateY(-1px);
+}
+
+.task-row--menu-open {
+  position: relative;
+  z-index: 20;
 }
 
 .task-row-focused {
