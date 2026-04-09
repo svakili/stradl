@@ -4,7 +4,7 @@ export interface Task {
   id: number;
   title: string;
   status: string;
-  priority: 'P0' | 'P1' | 'P2' | null;
+  priority: 'P0' | 'P1' | 'P2' | 'P3' | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;

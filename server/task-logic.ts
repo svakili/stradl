@@ -1,6 +1,6 @@
 import type { AppData, Task } from './storage.js';
 
-export const PRIORITY_ORDER: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+export const PRIORITY_ORDER: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 export function autoUnblock(data: AppData): boolean {
   const now = new Date();

@@ -37,9 +37,10 @@ describe('isTaskHiddenNow', () => {
 });
 
 describe('PRIORITY_ORDER', () => {
-  it('orders P0 < P1 < P2', () => {
+  it('orders P0 < P1 < P2 < P3', () => {
     expect(PRIORITY_ORDER['P0']).toBeLessThan(PRIORITY_ORDER['P1']);
     expect(PRIORITY_ORDER['P1']).toBeLessThan(PRIORITY_ORDER['P2']);
+    expect(PRIORITY_ORDER['P2']).toBeLessThan(PRIORITY_ORDER['P3']);
   });
 });
 

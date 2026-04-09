@@ -43,7 +43,7 @@ function sleep(ms: number): Promise<void> {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabName>('tasks');
-  const [counts, setCounts] = useState<Record<TabName, number>>({ tasks: 0, backlog: 0, ideas: 0, blocked: 0, hidden: 0, completed: 0, archive: 0 });
+  const [tabTasks, setTabTasks] = useState<Record<TabName, Task[]>>({ tasks: [], backlog: [], ideas: [], blocked: [], hidden: [], completed: [], archive: [] });
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [toasts, setToasts] = useState<ToastState[]>([]);
   const [pendingActionByTaskId, setPendingActionByTaskId] = useState<Record<number, boolean>>({});
@@ -100,13 +100,19 @@ export default function App() {
   }, []);
 
   // Filter tasks by search query
-  const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return tasks;
-    const q = searchQuery.toLowerCase();
-    return tasks.filter(t =>
-      t.title.toLowerCase().includes(q) || t.status.toLowerCase().includes(q)
-    );
-  }, [tasks, searchQuery]);
+  const matchesSearch = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return (_t: Task) => true;
+    return (t: Task) => t.title.toLowerCase().includes(q) || t.status.toLowerCase().includes(q);
+  }, [searchQuery]);
+  const filteredTasks = useMemo(() => tasks.filter(matchesSearch), [tasks, matchesSearch]);
+  const counts = useMemo<Record<TabName, number>>(() => {
+    const result: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, hidden: 0, completed: 0, archive: 0 };
+    TAB_ORDER.forEach(t => {
+      result[t] = tabTasks[t].filter(matchesSearch).length;
+    });
+    return result;
+  }, [tabTasks, matchesSearch]);
   const hasActiveSearch = searchQuery.trim().length > 0;
 
   const showToast = useCallback((
@@ -200,9 +206,9 @@ export default function App() {
 
   const loadCounts = useCallback(async () => {
     const results = await Promise.all(TAB_ORDER.map(t => api.fetchTasks(t)));
-    const newCounts: Record<TabName, number> = { tasks: 0, backlog: 0, ideas: 0, blocked: 0, hidden: 0, completed: 0, archive: 0 };
-    TAB_ORDER.forEach((t, i) => { newCounts[t] = results[i].length; });
-    setCounts(newCounts);
+    const newTabTasks: Record<TabName, Task[]> = { tasks: [], backlog: [], ideas: [], blocked: [], hidden: [], completed: [], archive: [] };
+    TAB_ORDER.forEach((t, i) => { newTabTasks[t] = results[i]; });
+    setTabTasks(newTabTasks);
 
     // Collect all tasks for blocker form dropdowns
     const all = new Map<number, Task>();
