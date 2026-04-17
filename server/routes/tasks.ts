@@ -201,8 +201,10 @@ taskRoutes.post('/tasks/:id/complete', (req, res) => {
   if (task.recurrence) {
     // Recurring task: hide until next occurrence instead of completing
     const intervalDays: Record<string, number> = { daily: 1, weekly: 7, biweekly: 14, monthly: 30 };
-    const ms = intervalDays[task.recurrence] * 24 * 60 * 60 * 1000;
-    task.hiddenUntilAt = new Date(Date.now() + ms).toISOString();
+    const next = new Date();
+    next.setDate(next.getDate() + intervalDays[task.recurrence]);
+    next.setHours(0, 0, 0, 0);
+    task.hiddenUntilAt = next.toISOString();
     task.completedAt = null;
     task.updatedAt = now;
   } else {
