@@ -52,29 +52,26 @@ function formatHiddenTimestamp(hiddenUntilAt: string | null): string {
   const now = new Date();
   const remainingMs = until.getTime() - now.getTime();
 
-  if (remainingMs <= 0) {
-    const label = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return `Hidden until ${label} (returning now)`;
+  const sameYear = until.getFullYear() === now.getFullYear();
+  const dateLabel = until.toLocaleDateString(undefined, sameYear
+    ? { weekday: 'short', month: 'short', day: 'numeric' }
+    : { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const timeLabel = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const absolute = `${dateLabel}, ${timeLabel}`;
+
+  if (remainingMs <= 0) return `Hidden until ${absolute} (returning now)`;
+
+  const remainingMinutes = Math.ceil(remainingMs / 60000);
+  let relative: string;
+  if (remainingMinutes < 60) {
+    relative = `in ${remainingMinutes}m`;
+  } else if (remainingMinutes < 60 * 24) {
+    relative = `in ${Math.ceil(remainingMinutes / 60)}h`;
+  } else {
+    relative = `in ${Math.ceil(remainingMinutes / (60 * 24))}d`;
   }
 
-  const isToday = until.toDateString() === now.toDateString();
-
-  if (isToday) {
-    const hiddenUntilLabel = until.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    const remainingMinutes = Math.ceil(remainingMs / 60000);
-    if (remainingMinutes < 60) return `Hidden until ${hiddenUntilLabel} (in ${remainingMinutes}m)`;
-    const remainingHours = Math.ceil(remainingMinutes / 60);
-    return `Hidden until ${hiddenUntilLabel} (in ${remainingHours}h)`;
-  }
-
-  const tomorrowDate = new Date(now);
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  if (until.toDateString() === tomorrowDate.toDateString()) {
-    return 'Hidden until tomorrow';
-  }
-
-  const dateLabel = until.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return `Hidden until ${dateLabel}`;
+  return `Hidden until ${absolute} (${relative})`;
 }
 
 export default function TaskRow({

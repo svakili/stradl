@@ -12,6 +12,7 @@ import TaskForm from './components/TaskForm';
 import SettingsPanel from './components/SettingsPanel';
 import VacationNudgeModal from './components/VacationNudgeModal';
 import { getVacationNudgeRecommendation, getManualVacationRecommendation } from './utils/vacationNudge';
+import { celebrateMilestone } from './utils/celebrate';
 
 interface ToastState {
   id: number;
@@ -103,7 +104,12 @@ export default function App() {
   const matchesSearch = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return (_t: Task) => true;
-    return (t: Task) => t.title.toLowerCase().includes(q) || t.status.toLowerCase().includes(q);
+    const idQuery = q.replace(/^#/, '');
+    const idMatch = /^\d+$/.test(idQuery) ? parseInt(idQuery, 10) : null;
+    return (t: Task) =>
+      t.title.toLowerCase().includes(q)
+      || t.status.toLowerCase().includes(q)
+      || (idMatch !== null && t.id === idMatch);
   }, [searchQuery]);
   const filteredTasks = useMemo(() => tasks.filter(matchesSearch), [tasks, matchesSearch]);
   const counts = useMemo<Record<TabName, number>>(() => {
@@ -306,6 +312,7 @@ export default function App() {
 
   const handleComplete = async (id: number) => {
     const RECURRENCE_LABELS: Record<string, string> = { daily: '1 day', weekly: '1 week', biweekly: '2 weeks', monthly: '30 days' };
+    const prevCompletedCount = tabTasks.completed.length;
     await runTaskAction(id, async () => {
       const result = await complete(id);
       await loadCounts();
@@ -314,6 +321,10 @@ export default function App() {
           void handleUnhide(id);
         });
       } else {
+        const newCount = prevCompletedCount + 1;
+        if (newCount > 0 && newCount % 100 === 0) {
+          celebrateMilestone(newCount);
+        }
         showToast('Task completed.', 'success', () => {
           void handleUncomplete(id);
         });
