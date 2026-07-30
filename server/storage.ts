@@ -72,7 +72,11 @@ export interface ImportDataResult {
 }
 
 export const CURRENT_SCHEMA_VERSION = 1;
-const SNAPSHOT_RETENTION_COUNT = 20;
+const SNAPSHOT_RETENTION_COUNT = 60;
+
+interface SnapshotState {
+  lastDailyDate?: string;
+}
 
 export function findProjectRoot(cwd = process.cwd()): string {
   const candidates = [
@@ -130,6 +134,49 @@ export function getDataFilePath(): string {
 
 export function getBackupsDirectory(paths: StoragePaths = resolveStoragePaths()): string {
   return path.join(paths.dataDir, 'backups');
+}
+
+function getSnapshotStatePath(paths: StoragePaths): string {
+  return path.join(paths.dataDir, '.snapshot-state.json');
+}
+
+function readSnapshotState(paths: StoragePaths): SnapshotState {
+  const statePath = getSnapshotStatePath(paths);
+  if (!fs.existsSync(statePath)) return {};
+  try {
+    const raw = fs.readFileSync(statePath, 'utf-8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed)) return {};
+    const lastDailyDate = typeof parsed.lastDailyDate === 'string' ? parsed.lastDailyDate : undefined;
+    return { lastDailyDate };
+  } catch {
+    return {};
+  }
+}
+
+function writeSnapshotState(paths: StoragePaths, state: SnapshotState): void {
+  fs.mkdirSync(paths.dataDir, { recursive: true });
+  writeJsonFile(getSnapshotStatePath(paths), state);
+}
+
+function formatLocalDate(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function maybeCreateDailySnapshot(paths: StoragePaths): void {
+  try {
+    if (!fs.existsSync(paths.dataFile)) return;
+    const today = formatLocalDate();
+    const state = readSnapshotState(paths);
+    if (state.lastDailyDate === today) return;
+    createDataSnapshot('daily', paths);
+    writeSnapshotState(paths, { ...state, lastDailyDate: today });
+  } catch (error) {
+    console.error('[stradl] Failed to create daily snapshot:', error);
+  }
 }
 
 function defaultSettings(): Settings {
@@ -481,6 +528,7 @@ export function readData(): AppData {
 }
 
 export function writeDataToPaths(data: AppData, paths: StoragePaths): void {
+  maybeCreateDailySnapshot(paths);
   const normalized = parseAppData(data);
   writeJsonFile(paths.dataFile, normalized);
 }
