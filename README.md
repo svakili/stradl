@@ -79,6 +79,8 @@ Automatic backups are written to:
 
 `~/Library/Application Support/Stradl/backups/`
 
+A new snapshot is also created automatically on the first task change each day; up to 60 snapshots are retained in total.
+
 During managed runtime updates, Stradl creates a `pre-update` snapshot before switching the active runtime.
 
 ## Releasing

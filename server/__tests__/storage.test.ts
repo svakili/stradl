@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readDataFromPaths, resolveStoragePaths, writeFileAtomically } from '../storage.js';
+import {
+  getBackupsDirectory,
+  readDataFromPaths,
+  resolveStoragePaths,
+  writeDataToPaths,
+  writeFileAtomically,
+} from '../storage.js';
 
 function makeAppData(title: string) {
   const now = '2026-02-24T00:00:00.000Z';
@@ -106,6 +112,113 @@ describe('storage migration pathing', () => {
 
     const data = readDataFromPaths(paths);
     expect(data.tasks[0].title).toBe('existing-target');
+  });
+});
+
+describe('daily auto-snapshots', () => {
+  function listDailySnapshots(paths: ReturnType<typeof resolveStoragePaths>): string[] {
+    const dir = getBackupsDirectory(paths);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).filter((name) => name.endsWith('-daily.json'));
+  }
+
+  function readStateFile(paths: ReturnType<typeof resolveStoragePaths>): { lastDailyDate?: string } {
+    const statePath = path.join(paths.dataDir, '.snapshot-state.json');
+    if (!fs.existsSync(statePath)) return {};
+    return JSON.parse(fs.readFileSync(statePath, 'utf-8')) as { lastDailyDate?: string };
+  }
+
+  function todayLocal(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  it('creates a daily snapshot on first write of the day and updates the marker', () => {
+    const { paths } = createProjectPaths();
+    writeJson(paths.dataFile, makeAppData('seed'));
+
+    writeDataToPaths(readDataFromPaths(paths), paths);
+
+    const snapshots = listDailySnapshots(paths);
+    expect(snapshots).toHaveLength(1);
+    expect(readStateFile(paths).lastDailyDate).toBe(todayLocal());
+  });
+
+  it('does not create a second daily snapshot on subsequent writes the same day', () => {
+    const { paths } = createProjectPaths();
+    writeJson(paths.dataFile, makeAppData('seed'));
+
+    writeDataToPaths(readDataFromPaths(paths), paths);
+    writeDataToPaths(readDataFromPaths(paths), paths);
+    writeDataToPaths(readDataFromPaths(paths), paths);
+
+    expect(listDailySnapshots(paths)).toHaveLength(1);
+  });
+
+  it('creates a fresh snapshot when the marker points to an earlier date', () => {
+    const { paths } = createProjectPaths();
+    writeJson(paths.dataFile, makeAppData('seed'));
+    fs.mkdirSync(paths.dataDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(paths.dataDir, '.snapshot-state.json'),
+      JSON.stringify({ lastDailyDate: '1999-01-01' })
+    );
+
+    writeDataToPaths(readDataFromPaths(paths), paths);
+
+    expect(listDailySnapshots(paths)).toHaveLength(1);
+    expect(readStateFile(paths).lastDailyDate).toBe(todayLocal());
+  });
+
+  it('treats a corrupt marker file as no-snapshot-yet and recovers', () => {
+    const { paths } = createProjectPaths();
+    writeJson(paths.dataFile, makeAppData('seed'));
+    fs.mkdirSync(paths.dataDir, { recursive: true });
+    fs.writeFileSync(path.join(paths.dataDir, '.snapshot-state.json'), '{not json');
+
+    expect(() => writeDataToPaths(readDataFromPaths(paths), paths)).not.toThrow();
+    expect(listDailySnapshots(paths)).toHaveLength(1);
+    expect(readStateFile(paths).lastDailyDate).toBe(todayLocal());
+  });
+
+  it('does not block the underlying write when snapshot creation fails', () => {
+    const { paths } = createProjectPaths();
+    writeJson(paths.dataFile, makeAppData('before'));
+
+    const backupsDir = getBackupsDirectory(paths);
+    fs.mkdirSync(paths.dataDir, { recursive: true });
+    fs.writeFileSync(backupsDir, 'not-a-directory');
+
+    const updated = readDataFromPaths(paths);
+    updated.tasks[0].title = 'after';
+
+    expect(() => writeDataToPaths(updated, paths)).not.toThrow();
+    expect(readDataFromPaths(paths).tasks[0].title).toBe('after');
+  });
+
+  it('skips the daily snapshot when the data file does not yet exist', () => {
+    const { paths } = createProjectPaths();
+
+    writeDataToPaths(
+      {
+        schemaVersion: 1,
+        tasks: [],
+        blockers: [],
+        settings: {
+          staleThresholdHours: 48,
+          topN: 20,
+          oneTimeOffsetHours: 0,
+          oneTimeOffsetExpiresAt: null,
+          vacationPromptLastShownForUpdatedAt: null,
+          focusedTaskId: null,
+        },
+        nextTaskId: 1,
+        nextBlockerId: 1,
+      },
+      paths
+    );
+
+    expect(listDailySnapshots(paths)).toHaveLength(0);
   });
 });
 
